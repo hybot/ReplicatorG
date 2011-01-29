@@ -221,6 +221,7 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 	JMenuItem stopItem;
 	JMenuItem pauseItem;
 	JMenuItem controlPanelItem;
+	JMenuItem statusPanelItem;
 	JMenuItem buildMenuItem;
 
 	JMenu machineMenu;
@@ -882,6 +883,15 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 		});
 		menu.add(controlPanelItem);
 		
+		statusPanelItem = new JMenuItem("Status Panel", 'S');
+		statusPanelItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S,ActionEvent.CTRL_MASK));
+		statusPanelItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				handleStatusPanel();
+			}
+		});
+		menu.add(statusPanelItem);
+
 		onboardParamsItem.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				handleOnboardPrefs();
@@ -1300,6 +1310,22 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 		}
 	}
 
+	public void handleStatusPanel() {
+		if (machine == null) {
+			JOptionPane.showMessageDialog(
+					this,
+					"ReplicatorG can't connect to your machine.\nTry checking your settings and resetting your machine.",
+					"Can't find machine", JOptionPane.ERROR_MESSAGE);
+		} else {
+			StatusPanelWindow window = StatusPanelWindow.getStatusPanel(machine);
+			if (window != null) {
+				window.pack();
+				window.setVisible(true);
+				window.toFront();
+			}
+		}
+	}
+
 	public void handleDisconnect() {
 		if (machine == null) {
 			// machine already disconnected
@@ -1706,6 +1732,8 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 		
 		// enable the control panel menu item when the machine is ready
 		controlPanelItem.setEnabled(evt.getState().isReady());
+		statusPanelItem.setEnabled(evt.getState().isConnected());
+
 		// enable the build menu item when the machine is ready and there is gcode in the editor
 		buildMenuItem.setEnabled(hasGcode && evt.getState().isReady());
 		onboardParamsItem.setVisible(showParams);
