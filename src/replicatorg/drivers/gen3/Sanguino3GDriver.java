@@ -632,9 +632,11 @@ public class Sanguino3GDriver extends SerialDriver
 			runCommand(pb.getPacket());
 		}
 		
+		// FIXME: We used to check for version here, but this will only work if we're connected. Atm., we'll rather
+		// require the latest firmware.
+		// getVersion().atLeast(new Version(2,4)) && toolVersion.atLeast(new Version(2,6))
 		if (this.machine.getTool(toolIndex).hasHeatedPlatform() && 
-			this.machine.currentTool().getPlatformTargetTemperature() > 0.0 &&
-			getVersion().atLeast(new Version(2,4)) && toolVersion.atLeast(new Version(2,6))) {
+			this.machine.currentTool().getPlatformTargetTemperature() > 0.0) {
 			PacketBuilder pb = new PacketBuilder(MotherboardCommandCode.WAIT_FOR_PLATFORM.getCode());
 			pb.add8((byte) toolIndex);
 			pb.add16(100); // delay between master -> slave pings (millis)
@@ -778,27 +780,6 @@ public class Sanguino3GDriver extends SerialDriver
 		// FIXME: First, check that the result code is OK. We occasionally receive RC_DOWNSTREAM_TIMEOUT codes here. kintel 20101207.
 		int status = pr.get8();
 		machine.currentTool().setToolStatus(status);
-
-		int errorTerm = (int)pr.get16();
-		int deltaTerm = (int)pr.get16();
-		int lastOutput = (int)pr.get16();
-		
-		// Convert to signed integers, this is dangerous.
-		if (errorTerm >= 1<<15 ) {
-			errorTerm = errorTerm - (1<<16);
-		}
-		if (deltaTerm >= 1<<15 ) {
-			deltaTerm = deltaTerm - (1<<16);
-		}
-		if (lastOutput >= 1<<15 ) {
-			lastOutput = lastOutput - (1<<16);
-		}
-		
-		Base.logger.log(Level.FINE,"Tool Status: "
-					+ machine.currentTool().getToolStatus()
-					+ "  PID error term: " + errorTerm 
-					+ "  PID delta term: " + deltaTerm
-					+ "  PID output: " + lastOutput);
 	}
 	
 	/***************************************************************************
