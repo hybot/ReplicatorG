@@ -142,7 +142,7 @@ public class MainButtonPanel extends BGPanel implements MachineListener, ActionL
 
 	final static Color BACK_COLOR = new Color(0x5F, 0x73, 0x25); 
 	MainButton simButton, pauseButton, stopButton;
-	MainButton buildButton, resetButton, cpButton;
+        MainButton buildButton, resetButton, cpButton, statusButton;
 	MainButton disconnectButton, connectButton;
 	
 	MainButton uploadButton, playbackButton, fileButton;
@@ -180,6 +180,9 @@ public class MainButtonPanel extends BGPanel implements MachineListener, ActionL
 		cpButton = makeButton("Control panel", "images/button-control-panel.png");
 		add(cpButton,"gap unrelated");
 		
+		statusButton = makeButton("Status panel", "images/button-status-panel.png");
+		add(statusButton,"gap unrelated");
+
 		resetButton = makeButton("Reset machine", "images/button-reset.png");
 		add(resetButton,"gap unrelated");
 		connectButton = makeButton("Connect machine", "images/button-connect.png");
@@ -192,7 +195,7 @@ public class MainButtonPanel extends BGPanel implements MachineListener, ActionL
 		statusLabel.setForeground(statusColor);
 		add(statusLabel, "gap unrelated");
 
-		setPreferredSize(new Dimension(700,60));
+		setPreferredSize(new Dimension(720,60));
 		
 		// Update initial state
 		machineStateChangedInternal(new MachineStateChangeEvent(null, new MachineState()));
@@ -238,6 +241,8 @@ public class MainButtonPanel extends BGPanel implements MachineListener, ActionL
 			editor.handleReset();
 		} else if (e.getSource() == cpButton) {
 			editor.handleControlPanel();
+		} else if (e.getSource() == statusButton) {
+			editor.handleStatusPanel();
 		} else if (e.getSource() == connectButton) {
 			editor.handleConnect();
 		} else if (e.getSource() == disconnectButton) {
@@ -288,7 +293,7 @@ public class MainButtonPanel extends BGPanel implements MachineListener, ActionL
 		disconnectButton.setEnabled(connected);
 		connectButton.setEnabled(hasMachine && !connected);
 		cpButton.setEnabled(ready);
-		
+		statusButton.setEnabled(connected);
 	}
 
 	public void updateFromMachine(final MachineController machine) {
