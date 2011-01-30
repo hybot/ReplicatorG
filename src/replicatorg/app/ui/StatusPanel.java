@@ -60,6 +60,7 @@ import replicatorg.app.Base;
 import replicatorg.app.MachineController;
 import replicatorg.drivers.Driver;
 import replicatorg.drivers.RetryException;
+import replicatorg.drivers.gen3.Sanguino3GDriver;
 import replicatorg.machine.model.ToolModel;
 import replicatorg.util.Point5d;
 
@@ -204,19 +205,24 @@ public class StatusPanel extends JPanel implements FocusListener {
 	setLayout(new MigLayout());
 	    
 	{
-	    JLabel label = makeLabel("Firmware");
-	    JLabel firmwareLabel = new JLabel();
-	    firmwareLabel.setText("v" + driver.getVersion());
-	    add(label);
-	    add(firmwareLabel, "wrap");
-	}
-
-	{
 	    JLabel label = makeLabel("Driver");
 	    JLabel driverLabel = new JLabel();
 	    driverLabel.setText(driver.getDriverName());
 	    add(label);
 	    add(driverLabel, "wrap");
+	}
+
+	{
+	    JLabel label = makeLabel("Firmware");
+	    JLabel firmwareLabel = new JLabel();
+	    String version = "Motherboard v" + driver.getVersion();
+	    if(driver instanceof Sanguino3GDriver) {
+		version += "/ Toolhead v" +
+		    ((Sanguino3GDriver)driver).getToolVersion();
+	    }
+	    firmwareLabel.setText(version);
+	    add(label);
+	    add(firmwareLabel, "wrap");
 	}
 
 	// create our motor options
