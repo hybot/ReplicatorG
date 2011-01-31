@@ -63,6 +63,7 @@ import java.io.IOException;
 import java.text.AttributedCharacterIterator;
 import java.text.AttributedString;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -126,6 +127,7 @@ import replicatorg.app.util.serial.Serial;
 import replicatorg.drivers.EstimationDriver;
 import replicatorg.drivers.MultiTool;
 import replicatorg.drivers.OnboardParameters;
+import replicatorg.drivers.RealtimeControl;
 import replicatorg.drivers.SDCardCapture;
 import replicatorg.drivers.UsesSerial;
 import replicatorg.machine.MachineListener;
@@ -697,7 +699,6 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 
 		// macosx already has its own preferences and quit menu
 		if (!Base.isMacOS()) {
-			menu.addSeparator();
 
 			item = newJMenuItem("Preferences", ',');
 			item.addActionListener(new ActionListener() {
@@ -722,15 +723,31 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 	private JMenuItem buildMenuFromPath(File path, Pattern pattern) {
 		if (!path.exists()) { return null; }
 		if (path.isDirectory()) {
-			JMenu menu = new JMenu(path.getName());
 			File[] files = path.listFiles();
+			Vector<JMenuItem> items = new Vector<JMenuItem>();
 			for (File f : files) {
 				JMenuItem i = buildMenuFromPath(f,pattern);
 				if (i != null) {
-					menu.add(i);
+					items.add(i);
 				}
 			}
-			if (menu.getItemCount() == 0) { return null; }
+			Collections.sort(items,new Comparator<JMenuItem>() {
+				public int compare(JMenuItem o1, JMenuItem o2) {
+					if (o1 instanceof JMenu) {
+						if (!(o2 instanceof JMenu)) {
+							return 1; // o1 is JMenu and o2 is not, display second
+						}
+					} else if (o2 instanceof JMenu) {
+						return -1; // o2 is JMenu and o1 is not, display first
+					}
+					return o1.getText().compareTo(o2.getText());
+				}
+			});
+			if (items.size() == 0) { return null; }
+			JMenu menu = new JMenu(path.getName());
+			for (JMenuItem i : items) {
+				menu.add(i);
+			}
 			return menu;
 		} else {
 			Matcher m = pattern.matcher(path.getName());
@@ -847,6 +864,7 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 	JMenuItem onboardParamsItem = new JMenuItem("Motherboard Onboard Preferences...");
 	JMenuItem extruderParamsItem = new JMenuItem("Toolhead Onboard Preferences...");
 	JMenuItem toolheadIndexingItem = new JMenuItem("Set Toolhead Index...");
+	JMenuItem realtimeControlItem = new JMenuItem("Open real time controls window...");
 	
 	protected JMenu buildMachineMenu() {
 		JMenuItem item;
@@ -913,8 +931,21 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 				handleToolheadIndexing();
 			}
 		});
+		
 		toolheadIndexingItem.setVisible(false);
 		menu.add(toolheadIndexingItem);
+		
+		realtimeControlItem.addActionListener(new ActionListener(){
+			public void actionPerformed(ActionEvent arg0) {
+				handleRealTimeControl();
+			}
+		});
+		if (machine != null && 
+				(machine.driver instanceof RealtimeControl))
+		{
+			realtimeControlItem.setVisible(false);
+			menu.add(realtimeControlItem);
+		}
 		
 		item = new JMenuItem("Upload new firmware...");
 		item.addActionListener(new ActionListener() {
@@ -939,7 +970,29 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 			indexer.setVisible(true);
 		}
 	}
-
+	public boolean supportsRealTimeControl() {
+		if (machine == null || 
+				!(machine.driver instanceof RealtimeControl)) {
+			return false;
+		}
+		Base.logger.info("Supports RC");
+		return true;
+	}
+	protected void handleRealTimeControl() {
+		if(!this.supportsRealTimeControl()) {
+			JOptionPane.showMessageDialog(
+					this,
+					"Real time control is not supported for your machine's driver.",
+					"Can't enabled real time control", JOptionPane.ERROR_MESSAGE);
+		} else {
+			RealtimePanel window = RealtimePanel.getRealtimePanel(machine);
+			if (window != null) {
+				window.pack();
+				window.setVisible(true);
+				window.toFront();
+			}
+		}
+	}
 	class MachineMenuListener implements ActionListener {
 		public void actionPerformed(ActionEvent e) {
 			if (machineMenu == null) {
@@ -1744,6 +1797,14 @@ public class MainWindow extends JFrame implements MRJAboutHandler, MRJQuitHandle
 			machine.getDriver() instanceof MultiTool &&
 			((MultiTool)machine.getDriver()).toolsCanBeReindexed();
 		toolheadIndexingItem.setVisible(showIndexing);
+		
+		boolean showRealtimeTuning = 
+			evt.getState().isReady() &&
+			machine != null &&
+			machine.getDriver() instanceof RealtimeControl &&
+			((RealtimeControl)machine.getDriver()).hasFeatureRealtimeControl();
+		realtimeControlItem.setVisible(showRealtimeTuning);
+		realtimeControlItem.setEnabled(showRealtimeTuning);
 		// Advertise machine name
 		String name = "Not Connected";
 		if (evt.getState().isConnected() && machine != null) {
