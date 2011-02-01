@@ -70,11 +70,13 @@ import replicatorg.util.Point5d;
 public class StatusPanel extends JPanel implements FocusListener {
     private ToolModel toolModel;
     private MachineController machine;
+    private StatusPanelWindow window;
 
     public ToolModel getTool() { return toolModel; }
 	
     protected double targetTemperature;
     protected double platformTargetTemperature;
+    protected Point5d position;
 	
     protected JLabel targetTempBox;
     protected JLabel currentTempBox;
@@ -85,11 +87,14 @@ public class StatusPanel extends JPanel implements FocusListener {
     protected JLabel pwmBox;
     protected JLabel rpmBox;
 
-    protected JLabel positionBox;
+    protected JLabel xyzBox;
+    protected JLabel abBox;
     protected JLabel feedRateBox;
 
     JTextField logFileNameField;
     JCheckBox logFileBox;
+    JComboBox updateBox;
+
     PrintWriter logFileWriter = null;
     boolean useCSV = false;
     
@@ -97,7 +102,10 @@ public class StatusPanel extends JPanel implements FocusListener {
     final private static Color measuredColor = Color.RED;
     final private static Color platformTargetColor = Color.YELLOW;
     final private static Color platformMeasuredColor = Color.WHITE;
-	
+
+    final private static String[] updateStrings = { "1", "2", "5", "10",
+						    "30", "60", "120" };
+
     long startMillis = System.currentTimeMillis();
 
     private TimeTableXYDataset measuredDataset = new TimeTableXYDataset();
@@ -193,9 +201,11 @@ public class StatusPanel extends JPanel implements FocusListener {
 	return label;
     }
 	
-    public StatusPanel(MachineController machine, ToolModel t) {
+    public StatusPanel(MachineController machine, ToolModel t, 
+		       final StatusPanelWindow window) {
 	this.machine = machine;
 	this.toolModel = t;
+	this.window = window;
 		
 	Dimension panelSize = new Dimension(420, 30);
 
@@ -225,6 +235,32 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    add(firmwareLabel, "wrap");
 	}
 
+	{
+	    JLabel label = new JLabel("X, Y, Z");
+	    xyzBox = makeBox(getPositionXyz());
+
+	    Dimension size = new Dimension(170, 25);
+	    xyzBox.setPreferredSize(size);
+	    xyzBox.setMinimumSize(size);
+	    xyzBox.setMaximumSize(size);
+
+	    add(label);
+	    add(xyzBox, "wrap");
+	}
+
+	{
+	    JLabel label = new JLabel("A, B");
+	    abBox = makeBox(getPositionAb());
+
+	    Dimension size = new Dimension(120, 25);
+	    abBox.setPreferredSize(size);
+	    abBox.setMinimumSize(size);
+	    abBox.setMaximumSize(size);
+
+	    add(label);
+	    add(abBox, "wrap");
+	}
+
 	// create our motor options
 	if (t.hasMotor()) {
 	    // Due to current implementation issues, we need to send the PWM
@@ -248,19 +284,6 @@ public class StatusPanel extends JPanel implements FocusListener {
 		add(label);
 		add(rpmBox,"wrap");
 	    }
-	}
-
-	{
-	    JLabel label = new JLabel("Position");
-	    positionBox = makeBox(getPositionText());
-
-	    Dimension size = new Dimension(220, 25);
-	    positionBox.setPreferredSize(size);
-	    positionBox.setMinimumSize(size);
-	    positionBox.setMaximumSize(size);
-
-	    add(label);
-	    add(positionBox, "wrap");
 	}
 
 	{
@@ -349,25 +372,24 @@ public class StatusPanel extends JPanel implements FocusListener {
 
 	    logFileBox = new JCheckBox("Enable");
 	    logFileBox.addActionListener(new ActionListener() {
-		    public void actionPerformed(ActionEvent event) {
-			if(logFileBox.isSelected()) {
-			    String fileName = logFileNameField.getText();
-			    try {
-				logFileWriter = 
-				    new PrintWriter(
-				        new FileOutputStream(fileName, true));
-				invalidLabel.setVisible(false);
-			    } catch (FileNotFoundException fnfe) {
-				logFileWriter = null;
-				Base.logger.log(Level.INFO, "Cannot open " +
-						fileName);
-				invalidLabel.setVisible(true);
-			    }
-			} else {
+	        public void actionPerformed(ActionEvent event) {
+		    if(logFileBox.isSelected()) {
+			String fileName = logFileNameField.getText();
+			try {
+			    logFileWriter = new PrintWriter(
+					new FileOutputStream(fileName, true));
+			    invalidLabel.setVisible(false);
+			} catch (FileNotFoundException fnfe) {
 			    logFileWriter = null;
+			    Base.logger.log(Level.INFO, "Cannot open " +
+					    fileName);
+			    invalidLabel.setVisible(true);
 			}
+		    } else {
+			logFileWriter = null;
 		    }
-		});
+		}
+	    });
 
 	    panel.add(label);
 	    panel.add(logFileNameField, "span 2");
@@ -377,15 +399,42 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    panel.add(logFileBox);
 	    add(panel, "spanx,wrap");
 	}
+
+	{
+	    JLabel label = new JLabel("Update Interval (sec)");
+	    updateBox = new JComboBox(updateStrings);
+	    updateBox.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent event) {
+		    String interval = (String) updateBox.getSelectedItem();
+		    Base.logger.log(Level.INFO, "new interval = " + interval);
+		    try {
+			window.setUpdateInterval(Integer.parseInt(interval) *
+						 1000);
+		    } catch (NumberFormatException nfe) {
+			Base.logger.log(Level.INFO, "Can't set interval = " + interval);
+		    }
+		}
+		    
+	    });
+	    add(label);
+	    add(updateBox, "wrap");
+	}
+
     }
 
-    public String getPositionText() {
-	Point5d p = driver.getCurrentPosition();
-	if(p == null) {
+    public String getPositionXyz() {
+	if(position == null) {
 	    return "unknown";
 	}
-	return String.format("%.2f, %.2f, %.2f, %.2f, %.2f",
-			     p.x(), p.y(), p.z(), p.a(), p.b());
+	return String.format("%.2f, %.2f, %.2f", 
+			     position.x(), position.y(), position.z());
+    }
+	    
+    public String getPositionAb() {
+	if(position == null) {
+	    return "unknown";
+	}
+	return String.format("%.2f, %.2f", position.a(), position.b());
     }
 	    
     class LogElement {
@@ -470,6 +519,18 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    LogElement root  = 
 		new LogElement("time", (int)(System.currentTimeMillis()/1000));
 
+	    // chid logElements should be added here in the same 
+	    // order as their UI elements are displayed
+
+	    position = driver.getCurrentPosition();
+	    String xyz = getPositionXyz();
+	    xyzBox.setText(xyz);
+	    root.add(new LogElement("xyz", xyz));
+
+	    String ab = getPositionAb();
+	    abBox.setText(ab);
+	    root.add(new LogElement("ab", ab));
+
 	    if (toolModel.hasMotor()) {
 		if (toolModel.getMotorStepperAxis() == null) {
 		    int pwm = driver.getMotorSpeedPWM();
@@ -482,10 +543,6 @@ public class StatusPanel extends JPanel implements FocusListener {
 		    root.add(new LogElement("rpm", rpm));
 		}
 	    }
-
-	    String position = getPositionText();
-	    positionBox.setText(position);
-	    root.add(new LogElement("position", position));
 
 	    String feedRate = Double.toString(driver.getCurrentFeedrate());
 	    feedRateBox.setText(feedRate);
