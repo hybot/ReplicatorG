@@ -186,10 +186,9 @@ public class StatusPanelWindow extends JFrame implements
     public void windowDeactivated(WindowEvent e) {
     }
 
-    void setUpdateInterval(int updateInterval) {
+    synchronized void setUpdateInterval(int updateInterval) {
 	if(updateThread != null) {
-	    updateThread.updateInterval = updateInterval;
-	    updateThread.notify();
+	    updateThread.setUpdateInterval(updateInterval);
 	}
     }
 
@@ -200,6 +199,10 @@ public class StatusPanelWindow extends JFrame implements
 	public UpdateThread(StatusPanelWindow w) {
 	    super("Status Panel Update Thread");
 	    window = w;
+	}
+
+	void setUpdateInterval(int updateInterval) {
+	    this.updateInterval = updateInterval;
 	}
 
 	public void run() {

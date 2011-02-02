@@ -381,7 +381,7 @@ public class StatusPanel extends JPanel implements FocusListener {
 			    invalidLabel.setVisible(false);
 			} catch (FileNotFoundException fnfe) {
 			    logFileWriter = null;
-			    Base.logger.log(Level.INFO, "Cannot open " +
+			    Base.logger.warning("Cannot open " +
 					    fileName);
 			    invalidLabel.setVisible(true);
 			}
@@ -406,12 +406,11 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    updateBox.addActionListener(new ActionListener() {
 		public void actionPerformed(ActionEvent event) {
 		    String interval = (String) updateBox.getSelectedItem();
-		    Base.logger.log(Level.INFO, "new interval = " + interval);
 		    try {
 			window.setUpdateInterval(Integer.parseInt(interval) *
 						 1000);
 		    } catch (NumberFormatException nfe) {
-			Base.logger.log(Level.INFO, "Can't set interval = " + interval);
+			Base.logger.warning("Can't set interval = " + interval);
 		    }
 		}
 		    
