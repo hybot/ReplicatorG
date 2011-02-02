@@ -116,6 +116,8 @@ public class StatusPanelWindow extends JFrame implements
 	// add our listener hooks.
 	addWindowListener(this);
 
+	setResizable(false);
+
 	// start our thread.
 	updateThread = new UpdateThread(this);
 	updateThread.start();
