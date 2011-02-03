@@ -243,8 +243,10 @@ public class StatusPanel extends JPanel {
 	    add(firmwareLabel, "wrap");
 	}
 
+	add(new JLabel(""), "span 2");
+	add(new JLabel("Enable"), "wrap");
+
 	{
-	    JLabel label = new JLabel("X, Y, Z");
 	    xyzBox = makeBox(getPositionXyz(null));
 	    xyzEnable = new JCheckBox("", true);
 
@@ -253,13 +255,12 @@ public class StatusPanel extends JPanel {
 	    xyzBox.setMinimumSize(size);
 	    xyzBox.setMaximumSize(size);
 
-	    add(label);
+	    add(makeLabel("X, Y, Z"));
 	    add(xyzBox);
 	    add(xyzEnable, "wrap");
 	}
 
 	{
-	    JLabel label = new JLabel("A, B");
 	    abBox = makeBox(getPositionAb(null));
 	    abEnable = new JCheckBox("", true);
 
@@ -268,7 +269,7 @@ public class StatusPanel extends JPanel {
 	    abBox.setMinimumSize(size);
 	    abBox.setMaximumSize(size);
 
-	    add(label);
+	    add(makeLabel("A, B"));
 	    add(abBox);
 	    add(abEnable, "wrap");
 	}
@@ -281,86 +282,78 @@ public class StatusPanel extends JPanel {
 	    // Gen4 stepper extruder.
 	    if (t.getMotorStepperAxis() == null) {
 		// our motor speed vars
-		JLabel label = makeLabel("Motor Speed (PWM)");
 		pwmBox = makeBox(null);
 		pwmEnable = new JCheckBox("", true);
 		
-		add(label);
+		add(makeLabel("Motor Speed (PWM)"));
 		add(pwmBox);
 		add(pwmEnable, "wrap");
 	    }
 
 	    if (t.motorHasEncoder() || t.motorIsStepper()) {
 		// our motor speed vars
-		JLabel label = makeLabel("Motor Speed (RPM)");
 		rpmBox = makeBox(null);
 		rpmEnable = new JCheckBox("", true);
 
-		add(label);
+		add(makeLabel("Motor Speed (RPM)"));
 		add(rpmBox);
 		add(rpmEnable, "wrap");
 	    }
 	}
 
 	{
-	    JLabel label = new JLabel("Feed Rate");
 	    feedRateBox = makeBox(null);
 	    feedRateEnable = new JCheckBox("", true);
-	    add(label);
+
+	    add(makeLabel("Feed Rate"));
 	    add(feedRateBox);
 	    add(feedRateEnable, "wrap");
 	}
 
 	// our tool head temperature fields
 	if (t.hasHeater()) {
-	    JLabel targetTempLabel = makeKeyLabel("Target Temperature (C)",
-						  targetColor);
 	    targetTempBox = makeBox(null);
 	    targetTempEnable = new JCheckBox("", true);
 
-	    add(targetTempLabel);
+	    add(makeKeyLabel("Target Temp (\u00b0C)", targetColor));
 	    add(targetTempBox);
 	    add(targetTempEnable, "wrap");
 
-	    JLabel currentTempLabel = makeKeyLabel("Current Temperature (C)",
-						   measuredColor);
 	    currentTempBox = makeBox("");
 	    currentTempEnable = new JCheckBox("", true);
 
-	    add(currentTempLabel);
+	    add(makeKeyLabel("Current Temp (\u00b0C)", measuredColor));
 	    add(currentTempBox);
 	    add(currentTempEnable, "wrap");
 	}
 
 	// our heated platform fields
 	if (t.hasHeatedPlatform()) {
-	    JLabel targetTempLabel = makeKeyLabel("Platform Target Temp (C)",
-						  platformTargetColor);
 	    platformTargetTempBox = makeBox(null);
 	    platformTargetTempEnable = new JCheckBox("", true);
 
-	    add(targetTempLabel);
+	    add(makeKeyLabel("Platform Target Temp (\u00b0C)",
+			     platformTargetColor));
 	    add(platformTargetTempBox);
 	    add(platformTargetTempEnable, "wrap");
 
-	    JLabel currentTempLabel = makeKeyLabel("Platform Current Temp (C)",
-						   platformMeasuredColor);
 	    platformCurrentTempBox = makeBox("");
 	    platformCurrentTempEnable = new JCheckBox("", true);
 
-	    add(currentTempLabel);
+	    add(makeKeyLabel("Platform Current Temp (\u00b0C)",
+			     platformMeasuredColor));
 	    add(platformCurrentTempBox);
 	    add(platformCurrentTempEnable, "wrap");
 	}
 
 	if (t.hasHeater() || t.hasHeatedPlatform()) {
-	    add(new JLabel("Temperature Chart"),"growx,spanx,wrap");
-	    add(makeChart(t),"growx,spanx,wrap");
+	    add(makeLabel("Temperature Chart"), "growx,spanx,wrap");
+	    add(makeChart(t), "growx,spanx,wrap");
 	}
 
 	{
 	    JPanel panel = new JPanel();
-	    panel.setBorder(BorderFactory.createTitledBorder("Data Log File"));
+	    panel.setBorder(BorderFactory.createTitledBorder("Data Log"));
 	    panel.setLayout(new MigLayout());
 
 	    final JLabel invalidLabel = new JLabel("Invaild File");
@@ -369,29 +362,32 @@ public class StatusPanel extends JPanel {
 
 	    Dimension fileNameSize = new Dimension(180, 25);
 
-	    JLabel label = new JLabel("File Name");
+	    JLabel label = makeLabel("File Name");
 	    logFileNameField = new JTextField();
 	    logFileNameField.setMinimumSize(fileNameSize);
 	    logFileNameField.setMaximumSize(fileNameSize);
 	    logFileNameField.setPreferredSize(fileNameSize);
 
-	    ButtonGroup group = new ButtonGroup();
-	    final JRadioButton csvBox = new JRadioButton("CSV");
 	    final JRadioButton taggedBox = new JRadioButton("Tagged");
-	    group.add(csvBox);
+	    taggedBox.setSelected(!useCSV);
+
+	    final JRadioButton csvBox = new JRadioButton("CSV");
+	    csvBox.setSelected(useCSV);
+
+	    ButtonGroup group = new ButtonGroup();
 	    group.add(taggedBox);
+	    group.add(csvBox);
+
 	    ActionListener radioListener = new ActionListener() {
 		    public void actionPerformed(ActionEvent event) {
 			useCSV = csvBox.isSelected();
 		    }		    
 		};
 
-	    csvBox.addActionListener(radioListener);
 	    taggedBox.addActionListener(radioListener);
-	    csvBox.setSelected(useCSV);
-	    taggedBox.setSelected(!useCSV);
+	    csvBox.addActionListener(radioListener);
 
-	    logFileEnable = new JCheckBox("Enable");
+	    logFileEnable = new JCheckBox("");
 	    logFileEnable.addActionListener(new ActionListener() {
 	        public void actionPerformed(ActionEvent event) {
 		    if(logFileEnable.isSelected()) {
@@ -415,10 +411,11 @@ public class StatusPanel extends JPanel {
 	    panel.add(label);
 	    panel.add(logFileNameField, "span 2");
 	    panel.add(invalidLabel, "wrap");
+	    panel.add(new JLabel(""));
 	    panel.add(taggedBox);
 	    panel.add(csvBox);
-	    panel.add(logFileEnable);
-	    add(panel, "spanx,wrap");
+	    add(panel, "span 2");
+	    add(logFileEnable, "wrap");
 	}
 
 	{
@@ -428,21 +425,34 @@ public class StatusPanel extends JPanel {
 		public void actionPerformed(ActionEvent event) {
 		    String interval = (String) updateBox.getSelectedItem();
 		    try {
-			window.setUpdateInterval(
-				 (int)(Double.parseDouble(interval) * 1000));
+			int newInterval = 
+			    (int)(Double.parseDouble(interval) * 1000);
+			if(newInterval > 50) {
+			    window.setUpdateInterval(newInterval);
+			} else {
+			    Base.logger.warning("Update interval too small:" +
+						newInterval);
+			}
 		    } catch (NumberFormatException nfe) {
-			Base.logger.warning("Can't set interval = " + interval);
+			Base.logger.warning("Can't set update interval = " +
+					    interval);
 		    }
 		}
 		    
 	    });
 
 	    // use 2 seconds as the default.
+	    // if you change this, change the intial delay in
+	    // StatusPanelWindow
 	    updateBox.setSelectedItem("2");
 	    add(label);
 	    add(updateBox, "wrap");
 	}
 
+    }
+
+    ToolModel getTool() {
+	return toolModel;
     }
 
     public String getPositionXyz(Point5d position) {

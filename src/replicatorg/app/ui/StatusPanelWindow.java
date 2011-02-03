@@ -196,7 +196,8 @@ public class StatusPanelWindow extends JFrame implements
 
     class UpdateThread extends Thread {
 	StatusPanelWindow window;
-	int updateInterval = 1000;
+	// this should be the same as the default in the StatusPanel
+	int updateInterval = 2000;
 
 	public UpdateThread(StatusPanelWindow w) {
 	    super("Status Panel Update Thread");
