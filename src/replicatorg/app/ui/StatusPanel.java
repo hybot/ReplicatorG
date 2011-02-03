@@ -67,32 +67,40 @@ import replicatorg.util.Point5d;
 /**
  * Report various status bits of a printer, while in operation.
  **/
-public class StatusPanel extends JPanel implements FocusListener {
+public class StatusPanel extends JPanel {
     private ToolModel toolModel;
     private MachineController machine;
     private StatusPanelWindow window;
 
-    public ToolModel getTool() { return toolModel; }
-	
-    protected double targetTemperature;
-    protected double platformTargetTemperature;
-    protected Point5d position;
-	
-    protected JLabel targetTempBox;
-    protected JLabel currentTempBox;
-	
-    protected JLabel platformTargetTempBox;
-    protected JLabel platformCurrentTempBox;
+    JLabel xyzBox;
+    JCheckBox xyzEnable;
 
-    protected JLabel pwmBox;
-    protected JLabel rpmBox;
+    JLabel abBox;
+    JCheckBox abEnable;
 
-    protected JLabel xyzBox;
-    protected JLabel abBox;
-    protected JLabel feedRateBox;
+    JLabel feedRateBox;
+    JCheckBox feedRateEnable;
+
+    JLabel pwmBox;
+    JCheckBox pwmEnable;
+
+    JLabel rpmBox;
+    JCheckBox rpmEnable;
+
+    JLabel targetTempBox;
+    JCheckBox targetTempEnable;
+
+    JLabel currentTempBox;
+    JCheckBox currentTempEnable;
+	
+    JLabel platformTargetTempBox;
+    JCheckBox platformTargetTempEnable;
+
+    JLabel platformCurrentTempBox;
+    JCheckBox platformCurrentTempEnable;
 
     JTextField logFileNameField;
-    JCheckBox logFileBox;
+    JCheckBox logFileEnable;
     JComboBox updateBox;
 
     PrintWriter logFileWriter = null;
@@ -103,7 +111,7 @@ public class StatusPanel extends JPanel implements FocusListener {
     final private static Color platformTargetColor = Color.YELLOW;
     final private static Color platformMeasuredColor = Color.WHITE;
 
-    final private static String[] updateStrings = { "1", "2", "5", "10",
+    final private static String[] updateStrings = { ".5", "1", "2", "5", "10",
 						    "30", "60", "120" };
 
     long startMillis = System.currentTimeMillis();
@@ -190,7 +198,7 @@ public class StatusPanel extends JPanel implements FocusListener {
 
     private JLabel makeBox(String text) {
 	JLabel label = new JLabel();
-	label.setText(text);
+	label.setText(text == null ? "" : text);
 	label.setMinimumSize(textBoxSize);
 	label.setMaximumSize(textBoxSize);
 	label.setPreferredSize(textBoxSize);
@@ -237,7 +245,8 @@ public class StatusPanel extends JPanel implements FocusListener {
 
 	{
 	    JLabel label = new JLabel("X, Y, Z");
-	    xyzBox = makeBox(getPositionXyz());
+	    xyzBox = makeBox(getPositionXyz(null));
+	    xyzEnable = new JCheckBox("", true);
 
 	    Dimension size = new Dimension(170, 25);
 	    xyzBox.setPreferredSize(size);
@@ -245,12 +254,14 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    xyzBox.setMaximumSize(size);
 
 	    add(label);
-	    add(xyzBox, "wrap");
+	    add(xyzBox);
+	    add(xyzEnable, "wrap");
 	}
 
 	{
 	    JLabel label = new JLabel("A, B");
-	    abBox = makeBox(getPositionAb());
+	    abBox = makeBox(getPositionAb(null));
+	    abEnable = new JCheckBox("", true);
 
 	    Dimension size = new Dimension(120, 25);
 	    abBox.setPreferredSize(size);
@@ -258,7 +269,8 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    abBox.setMaximumSize(size);
 
 	    add(label);
-	    add(abBox, "wrap");
+	    add(abBox);
+	    add(abEnable, "wrap");
 	}
 
 	// create our motor options
@@ -270,66 +282,75 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    if (t.getMotorStepperAxis() == null) {
 		// our motor speed vars
 		JLabel label = makeLabel("Motor Speed (PWM)");
-		pwmBox = makeBox(String.valueOf(driver.getMotorSpeedPWM()));
+		pwmBox = makeBox(null);
+		pwmEnable = new JCheckBox("", true);
 		
 		add(label);
-		add(pwmBox,"wrap");
+		add(pwmBox);
+		add(pwmEnable, "wrap");
 	    }
 
 	    if (t.motorHasEncoder() || t.motorIsStepper()) {
 		// our motor speed vars
 		JLabel label = makeLabel("Motor Speed (RPM)");
-		rpmBox = makeBox(String.valueOf(driver.getMotorRPM()));
+		rpmBox = makeBox(null);
+		rpmEnable = new JCheckBox("", true);
 
 		add(label);
-		add(rpmBox,"wrap");
+		add(rpmBox);
+		add(rpmEnable, "wrap");
 	    }
 	}
 
 	{
 	    JLabel label = new JLabel("Feed Rate");
-	    feedRateBox = makeBox(String.valueOf(driver.getCurrentFeedrate()));
+	    feedRateBox = makeBox(null);
+	    feedRateEnable = new JCheckBox("", true);
 	    add(label);
-	    add(feedRateBox, "wrap");
+	    add(feedRateBox);
+	    add(feedRateEnable, "wrap");
 	}
 
 	// our tool head temperature fields
 	if (t.hasHeater()) {
-	    targetTemperature = driver.getTemperatureSetting();
-
 	    JLabel targetTempLabel = makeKeyLabel("Target Temperature (C)",
 						  targetColor);
-	    targetTempBox = makeBox(Double.toString(targetTemperature));
+	    targetTempBox = makeBox(null);
+	    targetTempEnable = new JCheckBox("", true);
+
+	    add(targetTempLabel);
+	    add(targetTempBox);
+	    add(targetTempEnable, "wrap");
 
 	    JLabel currentTempLabel = makeKeyLabel("Current Temperature (C)",
 						   measuredColor);
 	    currentTempBox = makeBox("");
+	    currentTempEnable = new JCheckBox("", true);
 
-	    add(targetTempLabel);
-	    add(targetTempBox,"wrap");
 	    add(currentTempLabel);
-	    add(currentTempBox,"wrap");
+	    add(currentTempBox);
+	    add(currentTempEnable, "wrap");
 	}
 
 	// our heated platform fields
 	if (t.hasHeatedPlatform()) {
-	    platformTargetTemperature = driver.getPlatformTemperatureSetting();
-
 	    JLabel targetTempLabel = makeKeyLabel("Platform Target Temp (C)",
 						  platformTargetColor);
+	    platformTargetTempBox = makeBox(null);
+	    platformTargetTempEnable = new JCheckBox("", true);
 
-	    platformTargetTempBox = 
-		makeBox(Double.toString(platformTargetTemperature));
+	    add(targetTempLabel);
+	    add(platformTargetTempBox);
+	    add(platformTargetTempEnable, "wrap");
 
 	    JLabel currentTempLabel = makeKeyLabel("Platform Current Temp (C)",
 						   platformMeasuredColor);
-
 	    platformCurrentTempBox = makeBox("");
+	    platformCurrentTempEnable = new JCheckBox("", true);
 
-	    add(targetTempLabel);
-	    add(platformTargetTempBox,"wrap");
 	    add(currentTempLabel);
-	    add(platformCurrentTempBox,"wrap");
+	    add(platformCurrentTempBox);
+	    add(platformCurrentTempEnable, "wrap");
 	}
 
 	if (t.hasHeater() || t.hasHeatedPlatform()) {
@@ -370,10 +391,10 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    csvBox.setSelected(useCSV);
 	    taggedBox.setSelected(!useCSV);
 
-	    logFileBox = new JCheckBox("Enable");
-	    logFileBox.addActionListener(new ActionListener() {
+	    logFileEnable = new JCheckBox("Enable");
+	    logFileEnable.addActionListener(new ActionListener() {
 	        public void actionPerformed(ActionEvent event) {
-		    if(logFileBox.isSelected()) {
+		    if(logFileEnable.isSelected()) {
 			String fileName = logFileNameField.getText();
 			try {
 			    logFileWriter = new PrintWriter(
@@ -396,7 +417,7 @@ public class StatusPanel extends JPanel implements FocusListener {
 	    panel.add(invalidLabel, "wrap");
 	    panel.add(taggedBox);
 	    panel.add(csvBox);
-	    panel.add(logFileBox);
+	    panel.add(logFileEnable);
 	    add(panel, "spanx,wrap");
 	}
 
@@ -407,21 +428,24 @@ public class StatusPanel extends JPanel implements FocusListener {
 		public void actionPerformed(ActionEvent event) {
 		    String interval = (String) updateBox.getSelectedItem();
 		    try {
-			window.setUpdateInterval(Integer.parseInt(interval) *
-						 1000);
+			window.setUpdateInterval(
+				 (int)(Double.parseDouble(interval) * 1000));
 		    } catch (NumberFormatException nfe) {
 			Base.logger.warning("Can't set interval = " + interval);
 		    }
 		}
 		    
 	    });
+
+	    // use 2 seconds as the default.
+	    updateBox.setSelectedItem("2");
 	    add(label);
 	    add(updateBox, "wrap");
 	}
 
     }
 
-    public String getPositionXyz() {
+    public String getPositionXyz(Point5d position) {
 	if(position == null) {
 	    return "unknown";
 	}
@@ -429,7 +453,7 @@ public class StatusPanel extends JPanel implements FocusListener {
 			     position.x(), position.y(), position.z());
     }
 	    
-    public String getPositionAb() {
+    public String getPositionAb(Point5d position) {
 	if(position == null) {
 	    return "unknown";
 	}
@@ -509,96 +533,100 @@ public class StatusPanel extends JPanel implements FocusListener {
 	}
     }
 
-    public void updateStatus() {
+    synchronized public void updateStatus() {
 	if (machine.getModel().currentTool() == toolModel) {
 
 	    Second second = 
 		new Second(new Date(System.currentTimeMillis() - startMillis));
 
 	    LogElement root  = 
-		new LogElement("time", (int)(System.currentTimeMillis()/1000));
+		new LogElement("time", (int)(System.currentTimeMillis()));
 
 	    // chid logElements should be added here in the same 
 	    // order as their UI elements are displayed
 
-	    position = driver.getCurrentPosition();
-	    String xyz = getPositionXyz();
-	    xyzBox.setText(xyz);
-	    root.add(new LogElement("xyz", xyz));
+	    Point5d position = null;
 
-	    String ab = getPositionAb();
-	    abBox.setText(ab);
-	    root.add(new LogElement("ab", ab));
+	    if(xyzEnable.isSelected() || abEnable.isSelected()) {
+		position = driver.getCurrentPosition();
+	    }
+
+	    if(xyzEnable.isSelected()) {
+		String xyz = getPositionXyz(position);
+		xyzBox.setText(xyz);
+		root.add(new LogElement("xyz", xyz));
+	    }
+
+	    if(abEnable.isSelected()) {
+		String ab = getPositionAb(position);
+		abBox.setText(ab);
+		root.add(new LogElement("ab", ab));
+	    }
 
 	    if (toolModel.hasMotor()) {
 		if (toolModel.getMotorStepperAxis() == null) {
-		    int pwm = driver.getMotorSpeedPWM();
-		    pwmBox.setText(String.valueOf(pwm));
-		    root.add(new LogElement("pwm", pwm));
+		    if(pwmEnable.isSelected()) {
+			int pwm = driver.getMotorSpeedPWM();
+			pwmBox.setText(String.valueOf(pwm));
+			root.add(new LogElement("pwm", pwm));
+		    }
 		}
 		if (toolModel.motorHasEncoder() || toolModel.motorIsStepper()) {
-		    double rpm = driver.getMotorRPM();
-		    rpmBox.setText(String.valueOf(rpm));
-		    root.add(new LogElement("rpm", rpm));
+		    if(rpmEnable.isSelected()) {
+			double rpm = driver.getMotorRPM();
+			rpmBox.setText(String.valueOf(rpm));
+			root.add(new LogElement("rpm", rpm));
+		    }
 		}
 	    }
 
-	    String feedRate = Double.toString(driver.getCurrentFeedrate());
-	    feedRateBox.setText(feedRate);
-	    root.add(new LogElement("feedRate", feedRate));
+	    if(feedRateEnable.isSelected()) {
+		String feedRate = Double.toString(driver.getCurrentFeedrate());
+		feedRateBox.setText(feedRate);
+		root.add(new LogElement("feedRate", feedRate));
+	    }
 
 	    if (toolModel.hasHeater()) {
-		targetTemperature = driver.getTemperatureSetting();
-		double temperature = machine.getDriver().getTemperature();
+		if(targetTempEnable.isSelected()) {
+		    double target = driver.getTemperatureSetting();
+		    targetTempBox.setText(Double.toString(target));
+		    targetDataset.add(second, target, "a");
+		    root.add(new LogElement("targetTemperature", target));
+		}
+		if(currentTempEnable.isSelected()) {
+		    double temperature = driver.getTemperature();
+		    currentTempBox.setText(Double.toString(temperature));
 
-		updateTemperature(second, temperature);
-		root.add(new LogElement("targetTemperature", targetTemperature));
-		root.add(new LogElement("temperature", temperature));
+		    // avoid spikes in the graph when it's not readable
+		    if(temperature > 0) {
+			measuredDataset.add(second, temperature, "a");
+		    }
+		    root.add(new LogElement("temperature", temperature));
+		}
 	    }
 
 	    if (toolModel.hasHeatedPlatform()) {
-		platformTargetTemperature =
-		    driver.getPlatformTemperatureSetting();
-		double temperature =
-		    machine.getDriver().getPlatformTemperature();
+		if(platformTargetTempEnable.isSelected()) {
+		    double target = driver.getPlatformTemperatureSetting();
+		    platformTargetTempBox.setText(Double.toString(target));
+		    platformTargetDataset.add(second, target, "a");
+		    root.add(new LogElement("platformTargetTemperature",
+					    target));
+		}
+		if(platformCurrentTempEnable.isSelected()) {
+		    double temperature = driver.getPlatformTemperature();
+		    platformCurrentTempBox.setText(Double.toString(temperature));
 
-		updatePlatformTemperature(second, temperature);
-		root.add(new LogElement("platformTargetTemperature",
-					platformTargetTemperature));
-		root.add(new LogElement("platformTemperature", temperature));
+		    // avoid spikes in the graph when it's not readable
+		    if(temperature > 0) {
+			platformMeasuredDataset.add(second, temperature, "a");
+		    }
+		    root.add(new LogElement("platformTemperature",
+					    temperature));
+		}
 	    }
 
 	    root.log();
 	}
-    }
-	
-    synchronized public void updateTemperature(Second second,
-					       double temperature) {
-	targetTempBox.setText(Double.toString(targetTemperature));
-	currentTempBox.setText(Double.toString(temperature));
-	// avoid spikes in the graph when it's not readable
-	if(temperature > 0 || targetTemperature == 0) {
-	    measuredDataset.add(second, temperature, "a");
-	}
-	targetDataset.add(second, targetTemperature, "a");
-    }
-
-    synchronized public void updatePlatformTemperature(Second second,
-						       double temperature) {
-	platformTargetTempBox.setText(
-		      Double.toString(platformTargetTemperature));
-	platformCurrentTempBox.setText(Double.toString(temperature));
-
-	// avoid spikes in the graph when it's not readable
-	if(temperature > 0 || platformTargetTemperature == 0) {
-	    platformMeasuredDataset.add(second, temperature, "a");
-	}
-	platformTargetDataset.add(second, platformTargetTemperature, "a");
-    }
-
-    public void focusGained(FocusEvent e) {
-    }
-
-    public void focusLost(FocusEvent e) {
     }
 }
