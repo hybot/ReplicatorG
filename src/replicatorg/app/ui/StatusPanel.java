@@ -18,6 +18,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.logging.Level;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.PrintWriter;
@@ -30,6 +31,7 @@ import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JOptionPane;
@@ -99,7 +101,6 @@ public class StatusPanel extends JPanel {
     JLabel platformCurrentTempBox;
     JCheckBox platformCurrentTempEnable;
 
-    JTextField logFileNameField;
     JCheckBox logFileEnable;
     JComboBox updateBox;
 
@@ -348,25 +349,46 @@ public class StatusPanel extends JPanel {
 
 	if (t.hasHeater() || t.hasHeatedPlatform()) {
 	    add(makeLabel("Temperature Chart"), "growx,spanx,wrap");
-	    add(makeChart(t), "growx,spanx,wrap");
+	    add(makeChart(t), "growx,span 2,wrap");
 	}
 
 	{
-	    JPanel panel = new JPanel();
+	    final JPanel panel = new JPanel();
 	    panel.setBorder(BorderFactory.createTitledBorder("Data Log"));
 	    panel.setLayout(new MigLayout());
 
-	    final JLabel invalidLabel = new JLabel("Invaild File");
-	    invalidLabel.setForeground(Color.RED);
-	    invalidLabel.setVisible(false);
+	    final JLabel fileLabel = makeLabel("");
 
-	    Dimension fileNameSize = new Dimension(180, 25);
+	    final JFileChooser chooser = new JFileChooser();
 
-	    JLabel label = makeLabel("File Name");
-	    logFileNameField = new JTextField();
-	    logFileNameField.setMinimumSize(fileNameSize);
-	    logFileNameField.setMaximumSize(fileNameSize);
-	    logFileNameField.setPreferredSize(fileNameSize);
+	    JButton saveButton = new JButton("Select File ...");
+	    saveButton.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent event) {
+		    int returnVal = chooser.showSaveDialog(window);
+		    if(returnVal == JFileChooser.APPROVE_OPTION) {
+			File file = chooser.getSelectedFile();
+			if(file == null) {
+			    fileLabel.setText("Invalid File");
+			    fileLabel.setForeground(Color.RED);
+			    logFileWriter = null;
+			    return;
+			}
+
+			String fileName = file.getAbsolutePath();
+			try {
+			    logFileWriter = new PrintWriter(
+					new FileOutputStream(fileName, true));
+			    fileLabel.setText(file.getName());
+			    fileLabel.setForeground(Color.BLACK);
+			} catch (FileNotFoundException fnfe) {
+			    logFileWriter = null;
+			    Base.logger.warning("Cannot open " + fileName);
+			    fileLabel.setText("Invalid File");
+			    fileLabel.setForeground(Color.RED);
+			}
+		    }
+		}
+	    });
 
 	    final JRadioButton taggedBox = new JRadioButton("Tagged");
 	    taggedBox.setSelected(!useCSV);
@@ -379,39 +401,19 @@ public class StatusPanel extends JPanel {
 	    group.add(csvBox);
 
 	    ActionListener radioListener = new ActionListener() {
-		    public void actionPerformed(ActionEvent event) {
-			useCSV = csvBox.isSelected();
-		    }		    
-		};
+		public void actionPerformed(ActionEvent event) {
+		    useCSV = csvBox.isSelected();
+		}		    
+	    };
 
 	    taggedBox.addActionListener(radioListener);
 	    csvBox.addActionListener(radioListener);
 
 	    logFileEnable = new JCheckBox("");
-	    logFileEnable.addActionListener(new ActionListener() {
-	        public void actionPerformed(ActionEvent event) {
-		    if(logFileEnable.isSelected()) {
-			String fileName = logFileNameField.getText();
-			try {
-			    logFileWriter = new PrintWriter(
-					new FileOutputStream(fileName, true));
-			    invalidLabel.setVisible(false);
-			} catch (FileNotFoundException fnfe) {
-			    logFileWriter = null;
-			    Base.logger.warning("Cannot open " +
-					    fileName);
-			    invalidLabel.setVisible(true);
-			}
-		    } else {
-			logFileWriter = null;
-		    }
-		}
-	    });
 
-	    panel.add(label);
-	    panel.add(logFileNameField, "span 2");
-	    panel.add(invalidLabel, "wrap");
-	    panel.add(new JLabel(""));
+	    panel.add(saveButton, "growx, span 2");
+
+	    panel.add(fileLabel, "wrap");
 	    panel.add(taggedBox);
 	    panel.add(csvBox);
 	    add(panel, "span 2");
@@ -506,7 +508,7 @@ public class StatusPanel extends JPanel {
 
 	// this assumes the value will not contain < or >
 	void log(String indent) {
-	    if(logFileWriter == null) {
+	    if(logFileWriter == null || !logFileEnable.isSelected()) {
 		return;
 	    }
 
