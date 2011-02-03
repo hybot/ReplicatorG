@@ -475,6 +475,10 @@ public class StatusPanel extends JPanel {
 	    this(tag, String.valueOf(value));
 	}
 
+	LogElement(String tag, long value) {
+	    this(tag, String.valueOf(value));
+	}
+
 	LogElement(String tag, double value) {
 	    this(tag, String.valueOf(value));
 	}
@@ -540,7 +544,7 @@ public class StatusPanel extends JPanel {
 		new Second(new Date(System.currentTimeMillis() - startMillis));
 
 	    LogElement root  = 
-		new LogElement("time", (int)(System.currentTimeMillis()));
+		new LogElement("time", System.currentTimeMillis());
 
 	    // chid logElements should be added here in the same 
 	    // order as their UI elements are displayed
