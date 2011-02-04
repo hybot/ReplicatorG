@@ -13,12 +13,17 @@
 # |     +--Thingomatic-ABP
 # |        +--Thingomatic-HBP-Stepstruder
 # +--Cupcake-baseline
-#    +--Thingomatic-non-heated
+#    +--Cupcake-non-heated
 #       +--Cupcake-HBP
 #       +--Cupcake-ABP
 # 
-# Example of how to generate new diffs (NB! these must be manually examined before use):
+# Examples of how to generate new diffs (NB! these must be manually examined before use):
+# diff -P -u -x "*~" -x "\.*" -r SF35-Makerbot-baseline SF35-Thingomatic-baseline > Thingomatic.diff
+# diff -P -u -x "*~" -x "\.*" -r SF35-Makerbot-baseline SF35-cupcake-baseline > cupcake.diff
 # diff -P -u -x "*~" -x "\.*" -r SF35-Thingomatic-non-heated SF35-Thingomatic-HBP > HBP.diff
+# diff -P -u -x "*~" -x "\.*" -r SF35-Thingomatic-non-heated SF35-Thingomatic-ABP > Thingomatic-ABP.diff
+# diff -P -u -x "*~" -x "\.*" -r SF35-Thingomatic-HBP SF35-Thingomatic-HBP-Stepstruder > Stepstruder.diff
+# diff -P -u -x "*~" -x "\.*" -r SF35-cupcake-non-heated SF35-cupcake-ABP > cupcake-ABP.diff
 #
 
 if [ $# != 2 ]; then
@@ -33,7 +38,7 @@ echo "Using skeinforge version $VERSION"
 echo "Patching using $DIFFDIR"
 
 DIFFS=$PWD/$DIFFDIR
-cd skeinforge-$VERSION/skeinforge_application/prefs
+cd skeinforge-$VERSION/skeinforge_application/prefs-experimental
 
 echo "Building SF$VERSION-Thingomatic-baseline"
 rm -rf SF$VERSION-Thingomatic-baseline
