@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Vector;
 import java.util.logging.Level;
 
+import javax.vecmath.Point3d;
+
 import org.w3c.dom.Element;
 
 import replicatorg.app.Base;
@@ -55,7 +57,8 @@ public class Makerbot4GAlternateDriver extends Makerbot4GDriver {
 			Point5d steps = machine.mmToSteps(filteredpoint);		
 
 			// okay, send it off!
-			double minutes = delta.length() / getSafeFeedrate(delta);
+			// The 4. and 5. dimensions doesn't have a spatial interpretation. Calculate time in 3D space
+			double minutes = delta.get3D().distance(new Point3d())/ getSafeFeedrate(delta);
 			queueNewPoint(steps, (long) (60 * 1000 * 1000 * minutes), relative);
 
 			setInternalPosition(filteredpoint);
@@ -224,7 +227,8 @@ public class Makerbot4GAlternateDriver extends Makerbot4GDriver {
 	 */
 	public void enableStepperExtruderFan(boolean enabled) throws RetryException {
 		
-		if (this.stepperExtruderFanEnabled == enabled) return;
+		// Always re-enable the fan when 
+		//if (this.stepperExtruderFanEnabled == enabled) return;
 		
 		// FIXME: Should be called per hijacked axis with the correct tool
 		// our flag variable starts with motors enabled.
