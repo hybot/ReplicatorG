@@ -105,6 +105,7 @@ public class StatusPanel extends JPanel {
     JComboBox updateBox;
 
     PrintWriter logFileWriter = null;
+    String fileName = null;
     boolean useCSV = false;
     
     final private static Color targetColor = Color.BLUE;
@@ -125,6 +126,9 @@ public class StatusPanel extends JPanel {
 
     protected Driver driver;
 	
+    private final Dimension labelMinimumSize = new Dimension(175, 25);
+    private final Dimension textBoxSize = new Dimension(65, 25);
+
     /**
      * Make a label with an icon indicating its color on the graph.
      * @param text The text of the label
@@ -183,9 +187,6 @@ public class StatusPanel extends JPanel {
 	chartPanel.setOpaque(false);
 	return chartPanel;
     }
-
-    private final Dimension labelMinimumSize = new Dimension(175, 25);
-    private final Dimension textBoxSize = new Dimension(65, 25);
 
     private JLabel makeLabel(String text) {
 	JLabel label = new JLabel();
@@ -249,7 +250,7 @@ public class StatusPanel extends JPanel {
 
 	{
 	    xyzBox = makeBox(getPositionXyz(null));
-	    xyzEnable = new JCheckBox("", true);
+	    xyzEnable = makeCheckBox("", "status.xyz", false);
 
 	    Dimension size = new Dimension(170, 25);
 	    xyzBox.setPreferredSize(size);
@@ -263,7 +264,7 @@ public class StatusPanel extends JPanel {
 
 	{
 	    abBox = makeBox(getPositionAb(null));
-	    abEnable = new JCheckBox("", true);
+	    abEnable = makeCheckBox("", "status.ab", false);
 
 	    Dimension size = new Dimension(120, 25);
 	    abBox.setPreferredSize(size);
@@ -284,7 +285,7 @@ public class StatusPanel extends JPanel {
 	    if (t.getMotorStepperAxis() == null) {
 		// our motor speed vars
 		pwmBox = makeBox(null);
-		pwmEnable = new JCheckBox("", true);
+		pwmEnable = makeCheckBox("", "status.pwm", false);
 		
 		add(makeLabel("Motor Speed (PWM)"));
 		add(pwmBox);
@@ -294,7 +295,7 @@ public class StatusPanel extends JPanel {
 	    if (t.motorHasEncoder() || t.motorIsStepper()) {
 		// our motor speed vars
 		rpmBox = makeBox(null);
-		rpmEnable = new JCheckBox("", true);
+		rpmEnable = makeCheckBox("", "status.rpm", false);
 
 		add(makeLabel("Motor Speed (RPM)"));
 		add(rpmBox);
@@ -304,7 +305,7 @@ public class StatusPanel extends JPanel {
 
 	{
 	    feedRateBox = makeBox(null);
-	    feedRateEnable = new JCheckBox("", true);
+	    feedRateEnable = makeCheckBox("", "status.feedrate", false);
 
 	    add(makeLabel("Feed Rate"));
 	    add(feedRateBox);
@@ -314,14 +315,14 @@ public class StatusPanel extends JPanel {
 	// our tool head temperature fields
 	if (t.hasHeater()) {
 	    targetTempBox = makeBox(null);
-	    targetTempEnable = new JCheckBox("", true);
+	    targetTempEnable = makeCheckBox("", "status.target_temp", true);
 
 	    add(makeKeyLabel("Target Temp (\u00b0C)", targetColor));
 	    add(targetTempBox);
 	    add(targetTempEnable, "wrap");
 
 	    currentTempBox = makeBox("");
-	    currentTempEnable = new JCheckBox("", true);
+	    currentTempEnable = makeCheckBox("", "status.current_temp", true);
 
 	    add(makeKeyLabel("Current Temp (\u00b0C)", measuredColor));
 	    add(currentTempBox);
@@ -331,7 +332,8 @@ public class StatusPanel extends JPanel {
 	// our heated platform fields
 	if (t.hasHeatedPlatform()) {
 	    platformTargetTempBox = makeBox(null);
-	    platformTargetTempEnable = new JCheckBox("", true);
+	    platformTargetTempEnable = 
+		makeCheckBox("", "status.platform.target_temp", true);
 
 	    add(makeKeyLabel("Platform Target Temp (\u00b0C)",
 			     platformTargetColor));
@@ -339,7 +341,8 @@ public class StatusPanel extends JPanel {
 	    add(platformTargetTempEnable, "wrap");
 
 	    platformCurrentTempBox = makeBox("");
-	    platformCurrentTempEnable = new JCheckBox("", true);
+	    platformCurrentTempEnable = 
+		makeCheckBox("", "status.platform.current_temp", true);
 
 	    add(makeKeyLabel("Platform Current Temp (\u00b0C)",
 			     platformMeasuredColor));
@@ -357,9 +360,10 @@ public class StatusPanel extends JPanel {
 	    panel.setBorder(BorderFactory.createTitledBorder("Data Log"));
 	    panel.setLayout(new MigLayout());
 
-	    final JLabel fileLabel = makeLabel("");
+	    fileName = Base.preferences.get("status.log_file", fileName);
 
-	    final JFileChooser chooser = new JFileChooser();
+	    final JLabel fileLabel = makeLabel(getName(fileName));
+	    final JFileChooser chooser = new JFileChooser(fileName);
 
 	    JButton saveButton = new JButton("Select File ...");
 	    saveButton.addActionListener(new ActionListener() {
@@ -367,25 +371,22 @@ public class StatusPanel extends JPanel {
 		    int returnVal = chooser.showSaveDialog(window);
 		    if(returnVal == JFileChooser.APPROVE_OPTION) {
 			File file = chooser.getSelectedFile();
-			if(file == null) {
-			    fileLabel.setText("Invalid File");
+			if(file == null || 
+			   (file.exists() && !file.canWrite())) {
+			    fileLabel.setText("Cannot write " +
+					      ((file == null) ? 
+					       "File" : file.getName()));
 			    fileLabel.setForeground(Color.RED);
 			    logFileWriter = null;
+			    fileName = null;
 			    return;
 			}
 
-			String fileName = file.getAbsolutePath();
-			try {
-			    logFileWriter = new PrintWriter(
-					new FileOutputStream(fileName, true));
-			    fileLabel.setText(file.getName());
-			    fileLabel.setForeground(Color.BLACK);
-			} catch (FileNotFoundException fnfe) {
-			    logFileWriter = null;
-			    Base.logger.warning("Cannot open " + fileName);
-			    fileLabel.setText("Invalid File");
-			    fileLabel.setForeground(Color.RED);
-			}
+			fileName = file.getAbsolutePath();
+			Base.preferences.put("status.log_file", fileName);
+
+			fileLabel.setText(file.getName());
+			fileLabel.setForeground(Color.BLACK);
 		    }
 		}
 	    });
@@ -409,7 +410,38 @@ public class StatusPanel extends JPanel {
 	    taggedBox.addActionListener(radioListener);
 	    csvBox.addActionListener(radioListener);
 
-	    logFileEnable = new JCheckBox("");
+	    // this is the one enable checkbox that doesn't save state.
+	    // -- the user has to start logging each time it's desired.
+	    logFileEnable = new JCheckBox("", false);
+	    logFileEnable.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent event) {
+		    if(fileName == null) {
+			logFileEnable.setSelected(false);
+			return;
+		    }
+
+		    if(!logFileEnable.isSelected()) {
+			logFileWriter = null;
+			return;
+		    }
+
+		    try {
+			logFileWriter = new PrintWriter(
+					  new FileOutputStream(fileName, true));
+		    } catch (FileNotFoundException fnfe) {
+		        logFileWriter = null;
+			Base.logger.warning("Cannot open " + fileName);
+		    } finally {
+			if(logFileWriter == null) {
+			    logFileEnable.setSelected(false);
+			    fileLabel.setText("Cannot write " +
+					      ((fileName == null) ?
+					       "File" : getName(fileName)));
+			    fileLabel.setForeground(Color.RED);
+			}
+		    }
+		}
+	    });
 
 	    panel.add(saveButton, "growx, span 2");
 
@@ -453,8 +485,32 @@ public class StatusPanel extends JPanel {
 
     }
 
+    JCheckBox makeCheckBox(String text, final String pref, boolean defaultVal) {
+	JCheckBox cb = new JCheckBox(text);
+	cb.setSelected(Base.preferences.getBoolean(pref, defaultVal));
+	cb.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent e) {
+		    JCheckBox box = (JCheckBox)e.getSource();
+		    Base.preferences.putBoolean(pref, box.isSelected());
+		}
+	});
+	return cb;
+    }
+
     ToolModel getTool() {
 	return toolModel;
+    }
+
+    // get just the trailing file name comoponent of a path
+    String getName(String filePath) {
+	if(filePath == null) {
+	    return null;
+	}
+	int i = filePath.lastIndexOf(System.getProperty("file.separator"));
+	if(i >= 0) {
+	    return filePath.substring(i+1);
+	}
+	return filePath;
     }
 
     public String getPositionXyz(Point5d position) {

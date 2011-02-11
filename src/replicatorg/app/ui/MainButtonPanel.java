@@ -208,7 +208,7 @@ public class MainButtonPanel extends BGPanel implements MachineListener, ActionL
 		connectButton.setToolTipText("Connect to the machine.");
 		disconnectButton.setToolTipText("Disconnect from the machine.");
 
-		setPreferredSize(new Dimension(720,60));
+		setPreferredSize(new Dimension(755,60));
 		
 		// Update initial state
 		machineStateChangedInternal(new MachineStateChangeEvent(null, new MachineState()));
