@@ -132,7 +132,7 @@ public class StatusPanel extends JPanel {
     protected Driver driver;
 	
     private final Dimension labelMinimumSize = new Dimension(165, 25);
-    private final Dimension textBoxSize = new Dimension(45, 25);
+    private final Dimension textBoxSize = new Dimension(55, 25);
 
     /**
      * Make a label with an icon indicating its color on the graph.
@@ -306,14 +306,16 @@ public class StatusPanel extends JPanel {
 	driver = machine.getDriver();
 
 	// create our initial panel
-	setLayout(new MigLayout());
+	setLayout(new MigLayout("insets 2"));
 	    
+	JPanel infoPanel = new JPanel();
+	infoPanel.setLayout(new MigLayout("insets 1"));
 	{
 	    JLabel label = makeLabel("Driver");
 	    JLabel driverLabel = new JLabel();
 	    driverLabel.setText(driver.getDriverName());
-	    add(label);
-	    add(driverLabel, "wrap");
+	    infoPanel.add(label);
+	    infoPanel.add(driverLabel, "wrap");
 	}
 
 	{
@@ -325,56 +327,62 @@ public class StatusPanel extends JPanel {
 		    ((Sanguino3GDriver)driver).getToolVersion();
 	    }
 	    firmwareLabel.setText(version);
-	    add(label);
-	    add(firmwareLabel, "wrap");
+	    infoPanel.add(label);
+	    infoPanel.add(firmwareLabel, "wrap");
 	}
 
-	add(new JLabel(""), "span 2");
-	JLabel enable = new JLabel("Enable");
-	enable.setToolTipText("Enables gathering and logging of data types");
-	add(enable, "wrap");
+	add(infoPanel, "growx, span 2, wrap");
+
+	// temperature
+	JPanel tempPanel = new JPanel();
+	tempPanel.setBorder(BorderFactory.createTitledBorder("Temperature"));
+	tempPanel.setLayout(new MigLayout("insets 1"));
+
+	tempEnable = makeCheckBox("Enable", "status.temp", true);
+	tempEnable.setToolTipText("Toolhead and platform temperatures, " +
+				  "current and target");
+	tempPanel.add(tempEnable, "wrap");
 
 	if (t.hasHeater() || t.hasHeatedPlatform()) {
-	    tempEnable = makeCheckBox("", "status.temp", true);
-	    tempEnable.setToolTipText("Toolhead and platform temperatures, " +
-				      "current and target");
-
-	    ChartPanel panel = makeChart(t);
-	    panel.setBorder(BorderFactory.createTitledBorder("Temperature"));
-
-	    add(panel, "growx,span 2");
-	    add(tempEnable, "wrap");
+	    tempPanel.add(makeChart(t));
+	} else {
+	    tempEnable.setEnabled(false);
 	}
 
-	{
-	    xyzEnable = makeCheckBox("", "status.xyz", true);
-	    xyzEnable.setToolTipText("5D position");
-	    aBox = makeBox(null);
-	    bBox = makeBox(null);
+	add(tempPanel, "growx, growy");
+	
+	// position
+	final JPanel posPanel = new JPanel();
+	posPanel.setBorder(BorderFactory.createTitledBorder("Position"));
+	posPanel.setLayout(new MigLayout("insets 1"));
 
-	    final JPanel panel = new JPanel();
-	    panel.setBorder(BorderFactory.createTitledBorder("Position"));
-	    panel.setLayout(new MigLayout());
-	    
-	    panel.add(makeXYZChart(), "growx, spany 4");
-	    panel.add(new JLabel(" "), "wrap"); // glue
-	    panel.add(new JLabel("A"), "aligny center");
-	    panel.add(aBox, "wrap");
+	xyzEnable = makeCheckBox("Enable", "status.xyz", true);
+	xyzEnable.setToolTipText("5D position");
+	posPanel.add(xyzEnable, "span 3, wrap");
 
-	    panel.add(new JLabel(" "), "wrap"); // glue
-	    panel.add(new JLabel("B"), "aligny center");
-	    panel.add(bBox, "wrap");
+	aBox = makeBox(null);
+	bBox = makeBox(null);
 
-	    add(panel, "growx, span 2");
-	    add(xyzEnable, "wrap");
-	    
-	}
+	posPanel.add(makeXYZChart(), "spany 4, growx");
+	posPanel.add(new JLabel(" "), "span 2, wrap"); // glue
+	
+	posPanel.add(new JLabel("A"));
+	posPanel.add(aBox, "wrap");
 
+	posPanel.add(new JLabel(" "), "span 2, wrap"); // glue
+	posPanel.add(new JLabel("B"));
+	posPanel.add(bBox, "wrap");
+
+	add(posPanel, "growx, growy, wrap");
+
+	// speed
 	final JPanel speedPanel = new JPanel();
 	speedPanel.setBorder(BorderFactory.createTitledBorder("Speed"));
-	speedPanel.setLayout(new MigLayout());
-	speedEnable = makeCheckBox("", "status.speed", false);
+	speedPanel.setLayout(new MigLayout("insets 1"));
+
+	speedEnable = makeCheckBox("Enable", "status.speed", false);
 	speedEnable.setToolTipText("Extrusion motor speeds and feed rates");
+	speedPanel.add(speedEnable, "wrap");
 
 	// create our motor options
 	if (t.hasMotor()) {
@@ -397,155 +405,145 @@ public class StatusPanel extends JPanel {
 	    }
 	}
 
-	{
-	    feedRateBox = makeBox(null);
+	feedRateBox = makeBox(null);
 
-	    speedPanel.add(makeLabel("Feed Rate (mm/s)"));
-	    speedPanel.add(feedRateBox, "wrap");
-	}
+	speedPanel.add(makeLabel("Feed Rate (mm/min)"));
+	speedPanel.add(feedRateBox, "wrap");
 
-	add(speedPanel, "growx, span 2");
-	add(speedEnable, "wrap");
+	add(speedPanel, "growx, growy");
 
-	{
-	    final JPanel panel = new JPanel();
-	    panel.setBorder(BorderFactory.createTitledBorder("Data Log"));
-	    panel.setLayout(new MigLayout());
+	// data logging
+	final JPanel dataPanel = new JPanel();
+	dataPanel.setBorder(BorderFactory.createTitledBorder("Data Log"));
+	dataPanel.setLayout(new MigLayout("insets 1"));
 
-	    fileName = Base.preferences.get("status.log_file", fileName);
+	dataLogEnable = new JCheckBox("Enable", false);
+	dataLogEnable.setToolTipText("log data to selected file; unlike " +
+				     "other checkboxes checking this is " +
+				     "not sticky");
+	dataPanel.add(dataLogEnable, "wrap");
 
-	    final JLabel fileLabel = makeLabel(getName(fileName));
-	    fileLabel.setToolTipText("base file name of the log file");
+	fileName = Base.preferences.get("status.log_file", fileName);
 
-	    final JFileChooser chooser = new JFileChooser(fileName);
+	final JLabel fileLabel = makeLabel(getName(fileName));
+	fileLabel.setToolTipText("base file name of the log file");
 
-	    JButton saveButton = new JButton("Select File ...");
-	    saveButton.setToolTipText("data will be appended to the selected file");
-	    saveButton.addActionListener(new ActionListener() {
-		public void actionPerformed(ActionEvent event) {
-		    int returnVal = chooser.showSaveDialog(window);
-		    if(returnVal == JFileChooser.APPROVE_OPTION) {
-			File file = chooser.getSelectedFile();
-			if(file == null || 
-			   (file.exists() && !file.canWrite())) {
-			    fileLabel.setText("Cannot write " +
-					      ((file == null) ? 
-					       "File" : file.getName()));
-			    fileLabel.setForeground(Color.RED);
-			    logFileWriter = null;
-			    fileName = null;
-			    return;
-			}
+	final JFileChooser chooser = new JFileChooser(fileName);
 
-			fileName = file.getAbsolutePath();
-			Base.preferences.put("status.log_file", fileName);
-
-			fileLabel.setText(file.getName());
-			fileLabel.setForeground(Color.BLACK);
-		    }
-		}
-	    });
-
-	    final JRadioButton taggedBox = new JRadioButton("Tagged");
-	    taggedBox.setSelected(!useCSV);
-	    taggedBox.setToolTipText("log data in an XML style tag format");
-
-	    final JRadioButton csvBox = new JRadioButton("CSV");
-	    csvBox.setSelected(useCSV);
-	    csvBox.setToolTipText("log data in a spreadsheet compatible " +
-				  "Comma Separated Value format");
-
-	    ButtonGroup group = new ButtonGroup();
-	    group.add(taggedBox);
-	    group.add(csvBox);
-
-	    ActionListener radioListener = new ActionListener() {
-		public void actionPerformed(ActionEvent event) {
-		    useCSV = csvBox.isSelected();
-		}		    
-	    };
-
-	    taggedBox.addActionListener(radioListener);
-	    csvBox.addActionListener(radioListener);
-
-	    // this is the one enable checkbox that doesn't save state.
-	    // -- the user has to start logging each time it's desired.
-	    dataLogEnable = new JCheckBox("", false);
-	    dataLogEnable.setToolTipText("log data to selected file; unlike " +
-					 "other checkboxes checking this is " +
-					 "not sticky");
-
-	    dataLogEnable.addActionListener(new ActionListener() {
-		public void actionPerformed(ActionEvent event) {
-		    if(fileName == null) {
-			dataLogEnable.setSelected(false);
-			return;
-		    }
-
-		    if(!dataLogEnable.isSelected()) {
+	JButton saveButton = new JButton("Select File ...");
+	saveButton.setToolTipText("data will be appended to the selected file");
+	saveButton.addActionListener(new ActionListener() {
+	    public void actionPerformed(ActionEvent event) {
+		int returnVal = chooser.showSaveDialog(window);
+		if(returnVal == JFileChooser.APPROVE_OPTION) {
+		    File file = chooser.getSelectedFile();
+		    if(file == null || 
+		       (file.exists() && !file.canWrite())) {
+			fileLabel.setText("Cannot write " +
+					  ((file == null) ? 
+					   "File" : file.getName()));
+			fileLabel.setForeground(Color.RED);
 			logFileWriter = null;
+			fileName = null;
 			return;
 		    }
 
-		    try {
-			logFileWriter = new PrintWriter(
-					  new FileOutputStream(fileName, true));
-		    } catch (FileNotFoundException fnfe) {
-		        logFileWriter = null;
-			Base.logger.warning("Cannot open " + fileName);
-		    } finally {
-			if(logFileWriter == null) {
-			    dataLogEnable.setSelected(false);
-			    fileLabel.setText("Cannot write " +
-					      ((fileName == null) ?
-					       "File" : getName(fileName)));
-			    fileLabel.setForeground(Color.RED);
-			}
+		    fileName = file.getAbsolutePath();
+		    Base.preferences.put("status.log_file", fileName);
+
+		    fileLabel.setText(file.getName());
+		    fileLabel.setForeground(Color.BLACK);
+		}
+	    }
+	});
+
+	final JRadioButton taggedBox = new JRadioButton("Tagged");
+	taggedBox.setSelected(!useCSV);
+	taggedBox.setToolTipText("log data in an XML style tag format");
+
+	final JRadioButton csvBox = new JRadioButton("CSV");
+	csvBox.setSelected(useCSV);
+	csvBox.setToolTipText("log data in a spreadsheet compatible " +
+			      "Comma Separated Value format");
+
+	ButtonGroup group = new ButtonGroup();
+	group.add(taggedBox);
+	group.add(csvBox);
+
+	ActionListener radioListener = new ActionListener() {
+	    public void actionPerformed(ActionEvent event) {
+		useCSV = csvBox.isSelected();
+	    }		    
+	};
+
+	taggedBox.addActionListener(radioListener);
+	csvBox.addActionListener(radioListener);
+
+	dataLogEnable.addActionListener(new ActionListener() {
+	    public void actionPerformed(ActionEvent event) {
+		if(fileName == null) {
+		    dataLogEnable.setSelected(false);
+		    return;
+		}
+
+		if(!dataLogEnable.isSelected()) {
+		    logFileWriter = null;
+		    return;
+		}
+
+		try {
+		    logFileWriter =
+			new PrintWriter(new FileOutputStream(fileName, true));
+		} catch (FileNotFoundException fnfe) {
+		    logFileWriter = null;
+		    Base.logger.warning("Cannot open " + fileName);
+		} finally {
+		    if(logFileWriter == null) {
+			dataLogEnable.setSelected(false);
+			fileLabel.setText("Cannot write " +
+					  ((fileName == null) ?
+					   "File" : getName(fileName)));
+			fileLabel.setForeground(Color.RED);
 		    }
 		}
-	    });
+	    }
+	});
 
-	    panel.add(saveButton, "growx, span 2");
+	dataPanel.add(saveButton, "growx, span 2");
 
-	    panel.add(fileLabel, "wrap");
-	    panel.add(taggedBox);
-	    panel.add(csvBox);
-	    add(panel, "span 2, growx");
-	    add(dataLogEnable, "wrap");
-	}
+	dataPanel.add(fileLabel, "wrap");
+	dataPanel.add(taggedBox);
+	dataPanel.add(csvBox);
+	add(dataPanel, "growx");
 
-	{
-	    JLabel label = new JLabel("Update Interval (sec)");
-	    updateBox = new JComboBox(updateStrings);
-	    updateBox.setToolTipText("How often fields and charts are updated");
-	    updateBox.addActionListener(new ActionListener() {
-		public void actionPerformed(ActionEvent event) {
-		    String interval = (String) updateBox.getSelectedItem();
-		    try {
-			int newInterval = 
-			    (int)(Double.parseDouble(interval) * 1000);
-			if(newInterval > 50) {
-			    window.setUpdateInterval(newInterval);
-			} else {
-			    Base.logger.warning("Update interval too small:" +
-						newInterval);
-			}
-		    } catch (NumberFormatException nfe) {
-			Base.logger.warning("Can't set update interval = " +
-					    interval);
+	JLabel updateLabel = new JLabel("Update Interval (sec)");
+	updateBox = new JComboBox(updateStrings);
+	updateBox.setToolTipText("How often fields and charts are updated");
+	updateBox.addActionListener(new ActionListener() {
+	    public void actionPerformed(ActionEvent event) {
+		String interval = (String) updateBox.getSelectedItem();
+		try {
+		    int newInterval = 
+			(int)(Double.parseDouble(interval) * 1000);
+		    if(newInterval > 50) {
+			window.setUpdateInterval(newInterval);
+		    } else {
+			Base.logger.warning("Update interval too small:" +
+					    newInterval);
 		    }
+		} catch (NumberFormatException nfe) {
+		    Base.logger.warning("Can't set update interval = " +
+					interval);
 		}
-		    
-	    });
+	    }
+	});
 
-	    // use 1 second as the default.
-	    // if you change this, change the intial delay in
-	    // StatusPanelWindow
-	    updateBox.setSelectedItem("1");
-	    add(label);
-	    add(updateBox, "wrap");
-	}
-
+	// use 1 second as the default.
+	// if you change this, change the intial delay in
+	// StatusPanelWindow
+	updateBox.setSelectedItem("1");
+	infoPanel.add(updateLabel);
+	infoPanel.add(updateBox, "wrap");
     }
 
     JCheckBox makeCheckBox(String text, final String pref, boolean defaultVal) {
