@@ -3,6 +3,7 @@ package replicatorg.app.ui;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -24,7 +25,6 @@ import java.io.FileOutputStream;
 import java.io.PrintWriter;
 
 import javax.swing.BorderFactory;
-import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -44,16 +44,21 @@ import net.miginfocom.swing.MigLayout;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
+import org.jfree.chart.axis.AxisLocation;
+import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.NumberTickUnit;
 import org.jfree.chart.axis.TickUnits;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.DatasetRenderingOrder;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYDotRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.renderer.xy.XYStepRenderer;
 import org.jfree.data.time.Second;
 import org.jfree.data.time.TimeTableXYDataset;
+import org.jfree.data.xy.DefaultXYDataset;
+
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -64,6 +69,7 @@ import replicatorg.drivers.Driver;
 import replicatorg.drivers.RetryException;
 import replicatorg.drivers.gen3.Sanguino3GDriver;
 import replicatorg.machine.model.ToolModel;
+import replicatorg.machine.model.BuildVolume;
 import replicatorg.util.Point5d;
 
 /**
@@ -74,35 +80,28 @@ public class StatusPanel extends JPanel {
     private MachineController machine;
     private StatusPanelWindow window;
 
-    JLabel xyzBox;
-    JCheckBox xyzEnable;
-
-    JLabel abBox;
-    JCheckBox abEnable;
+    JLabel aBox;
+    JLabel bBox;
 
     JLabel feedRateBox;
-    JCheckBox feedRateEnable;
 
     JLabel pwmBox;
-    JCheckBox pwmEnable;
 
     JLabel rpmBox;
-    JCheckBox rpmEnable;
 
-    JLabel targetTempBox;
-    JCheckBox targetTempEnable;
+    JCheckBox tempEnable;
+    JCheckBox xyzEnable;
+    JCheckBox speedEnable;
+    JCheckBox dataLogEnable;
 
-    JLabel currentTempBox;
-    JCheckBox currentTempEnable;
-	
-    JLabel platformTargetTempBox;
-    JCheckBox platformTargetTempEnable;
-
-    JLabel platformCurrentTempBox;
-    JCheckBox platformCurrentTempEnable;
-
-    JCheckBox logFileEnable;
     JComboBox updateBox;
+
+    ValueAxis tempAxis;
+    ValueAxis platformTempAxis;
+
+    ValueAxis xAxis;
+    ValueAxis yAxis;
+    ValueAxis zAxis;
 
     PrintWriter logFileWriter = null;
     String fileName = null;
@@ -113,8 +112,11 @@ public class StatusPanel extends JPanel {
     final private static Color platformTargetColor = Color.YELLOW;
     final private static Color platformMeasuredColor = Color.WHITE;
 
-    final private static String[] updateStrings = { ".5", "1", "2", "5", "10",
-						    "30", "60", "120" };
+    final private static Color xyColor = Color.RED;
+    final private static Color zColor = Color.BLUE;
+
+    final private static String[] updateStrings = { ".1", ".5", "1", "2",
+						    "5", "10", "30", "60" };
 
     long startMillis = System.currentTimeMillis();
 
@@ -124,10 +126,13 @@ public class StatusPanel extends JPanel {
 	new TimeTableXYDataset();
     private TimeTableXYDataset platformTargetDataset = new TimeTableXYDataset();
 
+    private DefaultXYDataset xyDataset = new DefaultXYDataset();
+    private DefaultXYDataset zDataset = new DefaultXYDataset();
+
     protected Driver driver;
 	
-    private final Dimension labelMinimumSize = new Dimension(175, 25);
-    private final Dimension textBoxSize = new Dimension(65, 25);
+    private final Dimension labelMinimumSize = new Dimension(165, 25);
+    private final Dimension textBoxSize = new Dimension(45, 25);
 
     /**
      * Make a label with an icon indicating its color on the graph.
@@ -160,16 +165,29 @@ public class StatusPanel extends JPanel {
 	unitSource.add(new NumberTickUnit(1L*1000L)); // seconds
 	axis.setStandardTickUnits(unitSource);
 	axis.setTickLabelsVisible(false); // We don't need to see millisecs
-	axis = plot.getRangeAxis();
+
+	tempAxis = plot.getRangeAxis();
 
 	// set temperature range from 0 to 300
 	// degrees C so you can see overshoots 
-	axis.setRange(0, 300);
+	tempAxis.setRange(0, 300);
+
+        platformTempAxis = new NumberAxis();
+	platformTempAxis.setLabelPaint(tempAxis.getLabelPaint());
+	platformTempAxis.setLabelFont(tempAxis.getLabelFont());
+	platformTempAxis.setRange(tempAxis.getRange());
+	platformTempAxis.setStandardTickUnits(tempAxis.getStandardTickUnits());
+	platformTempAxis.setTickLabelsVisible(false);
+	platformTempAxis.setLabelAngle(Math.PI);
 
 	// Tweak L&F of chart
 	//((XYAreaRenderer)plot.getRenderer()).setOutline(true);
 	XYStepRenderer renderer = new XYStepRenderer();
 	plot.setDataset(1, targetDataset);
+
+        plot.setRangeAxis(1, platformTempAxis);
+        plot.mapDatasetToRangeAxis(1, 1);
+
 	plot.setRenderer(1, renderer);
 	plot.getRenderer(1).setSeriesPaint(0, targetColor);
 	plot.getRenderer(0).setSeriesPaint(0, measuredColor);
@@ -184,6 +202,72 @@ public class StatusPanel extends JPanel {
 	plot.setDatasetRenderingOrder(DatasetRenderingOrder.REVERSE);
 	ChartPanel chartPanel = new ChartPanel(chart);
 	chartPanel.setPreferredSize(new Dimension(400,160));
+	chartPanel.setOpaque(false);
+	return chartPanel;
+    }
+
+    public ChartPanel makeXYZChart() {
+	JFreeChart chart = ChartFactory.createScatterPlot(null, "x", "y", 
+				xyDataset, PlotOrientation.VERTICAL, 
+				false, false, false);
+	chart.setBorderVisible(false);
+	chart.setBackgroundPaint(null);
+	XYPlot plot = chart.getXYPlot();
+
+	TickUnits unitSource = new TickUnits();
+	unitSource.add(new NumberTickUnit(20L)); // 20 mm
+
+
+	//get our platform ranges
+	BuildVolume buildVolume = machine.getModel().getBuildVolume();
+
+	int maxX = (int)(buildVolume.getX()/2.0 + .5);
+	int maxY = (int)(buildVolume.getY()/2.0 + .5);
+
+	xAxis = plot.getDomainAxis();
+	xAxis.setStandardTickUnits(unitSource);
+	xAxis.setRange(-maxX, maxX);
+	xAxis.setMinorTickMarksVisible(false);
+	
+	yAxis = plot.getRangeAxis();
+	yAxis.setStandardTickUnits(unitSource);
+	yAxis.setRange(-maxY, maxY);
+	yAxis.setMinorTickMarksVisible(false);
+
+	XYDotRenderer renderer = new XYDotRenderer();
+	renderer.setDotHeight(5);
+	renderer.setDotWidth(7);
+	renderer.setBasePaint(xyColor);
+	renderer.setSeriesPaint(0, xyColor);
+	plot.setRenderer(0, renderer);
+   
+	// add a right side axis for Z
+        zAxis = new NumberAxis();
+	// make it look like the y label
+	zAxis.setLabelPaint(yAxis.getLabelPaint());
+	zAxis.setLabelFont(yAxis.getLabelFont());
+	zAxis.setLabelAngle(Math.PI);
+
+	zAxis.setStandardTickUnits(unitSource);
+	zAxis.setRange(0, buildVolume.getZ());
+	zAxis.setMinorTickMarksVisible(false);
+
+        plot.setRangeAxis(1, zAxis);
+	plot.setDataset(1, zDataset);
+        plot.mapDatasetToRangeAxis(1, 1);
+
+	// we use this as a line drawer, so that we only need
+	// to add a single point to the z dataset.
+	renderer = new XYDotRenderer();
+	renderer.setDotHeight(2);
+	renderer.setDotWidth(20);
+	renderer.setBasePaint(zColor);
+	renderer.setSeriesPaint(0, zColor);
+	plot.setRenderer(1, renderer);
+
+	ChartPanel chartPanel = new ChartPanel(chart);
+	chartPanel.setPreferredSize(new Dimension(210, 180));
+	chartPanel.setMaximumSize(new Dimension(210, 180));
 	chartPanel.setOpaque(false);
 	return chartPanel;
     }
@@ -210,7 +294,7 @@ public class StatusPanel extends JPanel {
 	label.setHorizontalAlignment(JLabel.LEFT);
 	return label;
     }
-	
+
     public StatusPanel(MachineController machine, ToolModel t, 
 		       final StatusPanelWindow window) {
 	this.machine = machine;
@@ -237,7 +321,7 @@ public class StatusPanel extends JPanel {
 	    JLabel firmwareLabel = new JLabel();
 	    String version = "Motherboard v" + driver.getVersion();
 	    if(driver instanceof Sanguino3GDriver) {
-		version += "/ Toolhead v" +
+		version += " / Extruder v" +
 		    ((Sanguino3GDriver)driver).getToolVersion();
 	    }
 	    firmwareLabel.setText(version);
@@ -246,35 +330,51 @@ public class StatusPanel extends JPanel {
 	}
 
 	add(new JLabel(""), "span 2");
-	add(new JLabel("Enable"), "wrap");
+	JLabel enable = new JLabel("Enable");
+	enable.setToolTipText("Enables gathering and logging of data types");
+	add(enable, "wrap");
+
+	if (t.hasHeater() || t.hasHeatedPlatform()) {
+	    tempEnable = makeCheckBox("", "status.temp", true);
+	    tempEnable.setToolTipText("Toolhead and platform temperatures, " +
+				      "current and target");
+
+	    ChartPanel panel = makeChart(t);
+	    panel.setBorder(BorderFactory.createTitledBorder("Temperature"));
+
+	    add(panel, "growx,span 2");
+	    add(tempEnable, "wrap");
+	}
 
 	{
-	    xyzBox = makeBox(getPositionXyz(null));
-	    xyzEnable = makeCheckBox("", "status.xyz", false);
+	    xyzEnable = makeCheckBox("", "status.xyz", true);
+	    xyzEnable.setToolTipText("5D position");
+	    aBox = makeBox(null);
+	    bBox = makeBox(null);
 
-	    Dimension size = new Dimension(170, 25);
-	    xyzBox.setPreferredSize(size);
-	    xyzBox.setMinimumSize(size);
-	    xyzBox.setMaximumSize(size);
+	    final JPanel panel = new JPanel();
+	    panel.setBorder(BorderFactory.createTitledBorder("Position"));
+	    panel.setLayout(new MigLayout());
+	    
+	    panel.add(makeXYZChart(), "growx, spany 4");
+	    panel.add(new JLabel(" "), "wrap"); // glue
+	    panel.add(new JLabel("A"), "aligny center");
+	    panel.add(aBox, "wrap");
 
-	    add(makeLabel("X, Y, Z"));
-	    add(xyzBox);
+	    panel.add(new JLabel(" "), "wrap"); // glue
+	    panel.add(new JLabel("B"), "aligny center");
+	    panel.add(bBox, "wrap");
+
+	    add(panel, "growx, span 2");
 	    add(xyzEnable, "wrap");
+	    
 	}
 
-	{
-	    abBox = makeBox(getPositionAb(null));
-	    abEnable = makeCheckBox("", "status.ab", false);
-
-	    Dimension size = new Dimension(120, 25);
-	    abBox.setPreferredSize(size);
-	    abBox.setMinimumSize(size);
-	    abBox.setMaximumSize(size);
-
-	    add(makeLabel("A, B"));
-	    add(abBox);
-	    add(abEnable, "wrap");
-	}
+	final JPanel speedPanel = new JPanel();
+	speedPanel.setBorder(BorderFactory.createTitledBorder("Speed"));
+	speedPanel.setLayout(new MigLayout());
+	speedEnable = makeCheckBox("", "status.speed", false);
+	speedEnable.setToolTipText("Extrusion motor speeds and feed rates");
 
 	// create our motor options
 	if (t.hasMotor()) {
@@ -283,77 +383,29 @@ public class StatusPanel extends JPanel {
 	    // controls in these cases. This shouldn't be necessary for a
 	    // Gen4 stepper extruder.
 	    if (t.getMotorStepperAxis() == null) {
-		// our motor speed vars
 		pwmBox = makeBox(null);
-		pwmEnable = makeCheckBox("", "status.pwm", false);
 		
-		add(makeLabel("Motor Speed (PWM)"));
-		add(pwmBox);
-		add(pwmEnable, "wrap");
+		speedPanel.add(makeLabel("Motor Speed (PWM)"));
+		speedPanel.add(pwmBox, "wrap");
 	    }
 
 	    if (t.motorHasEncoder() || t.motorIsStepper()) {
-		// our motor speed vars
 		rpmBox = makeBox(null);
-		rpmEnable = makeCheckBox("", "status.rpm", false);
 
-		add(makeLabel("Motor Speed (RPM)"));
-		add(rpmBox);
-		add(rpmEnable, "wrap");
+		speedPanel.add(makeLabel("Motor Speed (RPM)"));
+		speedPanel.add(rpmBox, "wrap");
 	    }
 	}
 
 	{
 	    feedRateBox = makeBox(null);
-	    feedRateEnable = makeCheckBox("", "status.feedrate", false);
 
-	    add(makeLabel("Feed Rate"));
-	    add(feedRateBox);
-	    add(feedRateEnable, "wrap");
+	    speedPanel.add(makeLabel("Feed Rate (mm/s)"));
+	    speedPanel.add(feedRateBox, "wrap");
 	}
 
-	// our tool head temperature fields
-	if (t.hasHeater()) {
-	    targetTempBox = makeBox(null);
-	    targetTempEnable = makeCheckBox("", "status.target_temp", true);
-
-	    add(makeKeyLabel("Target Temp (\u00b0C)", targetColor));
-	    add(targetTempBox);
-	    add(targetTempEnable, "wrap");
-
-	    currentTempBox = makeBox("");
-	    currentTempEnable = makeCheckBox("", "status.current_temp", true);
-
-	    add(makeKeyLabel("Current Temp (\u00b0C)", measuredColor));
-	    add(currentTempBox);
-	    add(currentTempEnable, "wrap");
-	}
-
-	// our heated platform fields
-	if (t.hasHeatedPlatform()) {
-	    platformTargetTempBox = makeBox(null);
-	    platformTargetTempEnable = 
-		makeCheckBox("", "status.platform.target_temp", true);
-
-	    add(makeKeyLabel("Platform Target Temp (\u00b0C)",
-			     platformTargetColor));
-	    add(platformTargetTempBox);
-	    add(platformTargetTempEnable, "wrap");
-
-	    platformCurrentTempBox = makeBox("");
-	    platformCurrentTempEnable = 
-		makeCheckBox("", "status.platform.current_temp", true);
-
-	    add(makeKeyLabel("Platform Current Temp (\u00b0C)",
-			     platformMeasuredColor));
-	    add(platformCurrentTempBox);
-	    add(platformCurrentTempEnable, "wrap");
-	}
-
-	if (t.hasHeater() || t.hasHeatedPlatform()) {
-	    add(makeLabel("Temperature Chart"), "growx,spanx,wrap");
-	    add(makeChart(t), "growx,span 2,wrap");
-	}
+	add(speedPanel, "growx, span 2");
+	add(speedEnable, "wrap");
 
 	{
 	    final JPanel panel = new JPanel();
@@ -363,9 +415,12 @@ public class StatusPanel extends JPanel {
 	    fileName = Base.preferences.get("status.log_file", fileName);
 
 	    final JLabel fileLabel = makeLabel(getName(fileName));
+	    fileLabel.setToolTipText("base file name of the log file");
+
 	    final JFileChooser chooser = new JFileChooser(fileName);
 
 	    JButton saveButton = new JButton("Select File ...");
+	    saveButton.setToolTipText("data will be appended to the selected file");
 	    saveButton.addActionListener(new ActionListener() {
 		public void actionPerformed(ActionEvent event) {
 		    int returnVal = chooser.showSaveDialog(window);
@@ -393,9 +448,12 @@ public class StatusPanel extends JPanel {
 
 	    final JRadioButton taggedBox = new JRadioButton("Tagged");
 	    taggedBox.setSelected(!useCSV);
+	    taggedBox.setToolTipText("log data in an XML style tag format");
 
 	    final JRadioButton csvBox = new JRadioButton("CSV");
 	    csvBox.setSelected(useCSV);
+	    csvBox.setToolTipText("log data in a spreadsheet compatible " +
+				  "Comma Separated Value format");
 
 	    ButtonGroup group = new ButtonGroup();
 	    group.add(taggedBox);
@@ -412,15 +470,19 @@ public class StatusPanel extends JPanel {
 
 	    // this is the one enable checkbox that doesn't save state.
 	    // -- the user has to start logging each time it's desired.
-	    logFileEnable = new JCheckBox("", false);
-	    logFileEnable.addActionListener(new ActionListener() {
+	    dataLogEnable = new JCheckBox("", false);
+	    dataLogEnable.setToolTipText("log data to selected file; unlike " +
+					 "other checkboxes checking this is " +
+					 "not sticky");
+
+	    dataLogEnable.addActionListener(new ActionListener() {
 		public void actionPerformed(ActionEvent event) {
 		    if(fileName == null) {
-			logFileEnable.setSelected(false);
+			dataLogEnable.setSelected(false);
 			return;
 		    }
 
-		    if(!logFileEnable.isSelected()) {
+		    if(!dataLogEnable.isSelected()) {
 			logFileWriter = null;
 			return;
 		    }
@@ -433,7 +495,7 @@ public class StatusPanel extends JPanel {
 			Base.logger.warning("Cannot open " + fileName);
 		    } finally {
 			if(logFileWriter == null) {
-			    logFileEnable.setSelected(false);
+			    dataLogEnable.setSelected(false);
 			    fileLabel.setText("Cannot write " +
 					      ((fileName == null) ?
 					       "File" : getName(fileName)));
@@ -448,13 +510,14 @@ public class StatusPanel extends JPanel {
 	    panel.add(fileLabel, "wrap");
 	    panel.add(taggedBox);
 	    panel.add(csvBox);
-	    add(panel, "span 2");
-	    add(logFileEnable, "wrap");
+	    add(panel, "span 2, growx");
+	    add(dataLogEnable, "wrap");
 	}
 
 	{
 	    JLabel label = new JLabel("Update Interval (sec)");
 	    updateBox = new JComboBox(updateStrings);
+	    updateBox.setToolTipText("How often fields and charts are updated");
 	    updateBox.addActionListener(new ActionListener() {
 		public void actionPerformed(ActionEvent event) {
 		    String interval = (String) updateBox.getSelectedItem();
@@ -475,10 +538,10 @@ public class StatusPanel extends JPanel {
 		    
 	    });
 
-	    // use 2 seconds as the default.
+	    // use 1 second as the default.
 	    // if you change this, change the intial delay in
 	    // StatusPanelWindow
-	    updateBox.setSelectedItem("2");
+	    updateBox.setSelectedItem("1");
 	    add(label);
 	    add(updateBox, "wrap");
 	}
@@ -513,19 +576,13 @@ public class StatusPanel extends JPanel {
 	return filePath;
     }
 
-    public String getPositionXyz(Point5d position) {
+    public String getPositionText(Point5d position) {
 	if(position == null) {
 	    return "unknown";
 	}
-	return String.format("%.2f, %.2f, %.2f", 
-			     position.x(), position.y(), position.z());
-    }
-	    
-    public String getPositionAb(Point5d position) {
-	if(position == null) {
-	    return "unknown";
-	}
-	return String.format("%.2f, %.2f", position.a(), position.b());
+	return String.format("%.2f, %.2f, %.2f, %.2f, %.2f", 
+			     position.x(), position.y(), position.z(),
+			     position.a(), position.b());
     }
 	    
     class LogElement {
@@ -564,7 +621,7 @@ public class StatusPanel extends JPanel {
 
 	// this assumes the value will not contain < or >
 	void log(String indent) {
-	    if(logFileWriter == null || !logFileEnable.isSelected()) {
+	    if(logFileWriter == null || !dataLogEnable.isSelected()) {
 		return;
 	    }
 
@@ -619,32 +676,38 @@ public class StatusPanel extends JPanel {
 
 	    Point5d position = null;
 
-	    if(xyzEnable.isSelected() || abEnable.isSelected()) {
+	    if(xyzEnable.isSelected()) {
 		position = driver.getCurrentPosition();
 	    }
 
 	    if(xyzEnable.isSelected()) {
-		String xyz = getPositionXyz(position);
-		xyzBox.setText(xyz);
-		root.add(new LogElement("xyz", xyz));
-	    }
+		//todo: permit multiple series for data overlays
+		final String series = "1";
 
-	    if(abEnable.isSelected()) {
-		String ab = getPositionAb(position);
-		abBox.setText(ab);
-		root.add(new LogElement("ab", ab));
+		xyDataset.addSeries(series,  new double[][] { {position.x()},
+							      {position.y()}});
+		zDataset.addSeries(series,  new double[][]
+		    { {xAxis.getUpperBound()}, {position.z()} });
+
+		xAxis.setLabel(String.format("X = %.1f", position.x())); 
+		yAxis.setLabel(String.format("Y = %.1f", position.y())); 
+		zAxis.setLabel(String.format("Z = %.1f", position.z())); 
+
+		aBox.setText(String.valueOf(position.a()));
+		bBox.setText(String.valueOf(position.b()));
+		root.add(new LogElement("position", getPositionText(position)));
 	    }
 
 	    if (toolModel.hasMotor()) {
 		if (toolModel.getMotorStepperAxis() == null) {
-		    if(pwmEnable.isSelected()) {
+		    if(speedEnable.isSelected()) {
 			int pwm = driver.getMotorSpeedPWM();
 			pwmBox.setText(String.valueOf(pwm));
 			root.add(new LogElement("pwm", pwm));
 		    }
 		}
 		if (toolModel.motorHasEncoder() || toolModel.motorIsStepper()) {
-		    if(rpmEnable.isSelected()) {
+		    if(speedEnable.isSelected()) {
 			double rpm = driver.getMotorRPM();
 			rpmBox.setText(String.valueOf(rpm));
 			root.add(new LogElement("rpm", rpm));
@@ -652,50 +715,46 @@ public class StatusPanel extends JPanel {
 		}
 	    }
 
-	    if(feedRateEnable.isSelected()) {
+	    if(speedEnable.isSelected()) {
 		String feedRate = Double.toString(driver.getCurrentFeedrate());
 		feedRateBox.setText(feedRate);
 		root.add(new LogElement("feedRate", feedRate));
 	    }
 
-	    if (toolModel.hasHeater()) {
-		if(targetTempEnable.isSelected()) {
-		    double target = driver.getTemperatureSetting();
-		    targetTempBox.setText(Double.toString(target));
-		    targetDataset.add(second, target, "a");
-		    root.add(new LogElement("targetTemperature", target));
-		}
-		if(currentTempEnable.isSelected()) {
-		    double temperature = driver.getTemperature();
-		    currentTempBox.setText(Double.toString(temperature));
+	    if (toolModel.hasHeater() && tempEnable.isSelected()) {
+		double target = driver.getTemperatureSetting();
+		targetDataset.add(second, target, "a");
+		root.add(new LogElement("targetTemperature", target));
 
-		    // avoid spikes in the graph when it's not readable
-		    if(temperature > 0) {
-			measuredDataset.add(second, temperature, "a");
-		    }
-		    root.add(new LogElement("temperature", temperature));
+		double temperature = driver.getTemperature();
+
+		// avoid spikes in the graph when it's not readable
+		if(temperature > 0) {
+		    measuredDataset.add(second, temperature, "a");
 		}
+		root.add(new LogElement("temperature", temperature));
+
+		tempAxis.setLabel(String.format("temp = %.0f/%.0f", 
+						temperature, target));
 	    }
 
-	    if (toolModel.hasHeatedPlatform()) {
-		if(platformTargetTempEnable.isSelected()) {
-		    double target = driver.getPlatformTemperatureSetting();
-		    platformTargetTempBox.setText(Double.toString(target));
-		    platformTargetDataset.add(second, target, "a");
-		    root.add(new LogElement("platformTargetTemperature",
-					    target));
-		}
-		if(platformCurrentTempEnable.isSelected()) {
-		    double temperature = driver.getPlatformTemperature();
-		    platformCurrentTempBox.setText(Double.toString(temperature));
+	    if (toolModel.hasHeatedPlatform() && tempEnable.isSelected()) {
+		double target = driver.getPlatformTemperatureSetting();
+		platformTargetDataset.add(second, target, "a");
+		root.add(new LogElement("platformTargetTemperature",
+					target));
 
-		    // avoid spikes in the graph when it's not readable
-		    if(temperature > 0) {
-			platformMeasuredDataset.add(second, temperature, "a");
-		    }
-		    root.add(new LogElement("platformTemperature",
-					    temperature));
+		double temperature = driver.getPlatformTemperature();
+
+		// avoid spikes in the graph when it's not readable
+		if(temperature > 0) {
+		    platformMeasuredDataset.add(second, temperature, "a");
 		}
+		root.add(new LogElement("platformTemperature",
+					temperature));
+
+		platformTempAxis.setLabel(String.format("plat temp = %.0f/%.0f", 
+							temperature, target));
 	    }
 
 	    root.log();
