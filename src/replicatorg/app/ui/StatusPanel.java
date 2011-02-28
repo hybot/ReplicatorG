@@ -142,10 +142,10 @@ public class StatusPanel extends JPanel {
      */
     private JLabel makeKeyLabel(String text, Color c) {
 	BufferedImage image = 
-	    new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+	    new BufferedImage(6, 6, BufferedImage.TYPE_INT_RGB);
 	Graphics g = image.getGraphics();
 	g.setColor(c);
-	g.fillRect(0,0,10,10);
+	g.fillRect(0,0,6,6);
 	Icon icon = new ImageIcon(image);
 	return new JLabel(text,icon,SwingConstants.LEFT);
     }
@@ -368,7 +368,14 @@ public class StatusPanel extends JPanel {
 	tempPanel.add(tempEnable, "wrap");
 
 	if (t.hasHeater() || t.hasHeatedPlatform()) {
-	    tempPanel.add(makeChart(t));
+	    tempPanel.add(makeChart(t), "wrap");
+	    JPanel keyPanel = new JPanel();
+	    keyPanel.add(makeKeyLabel("Current", measuredColor));
+	    keyPanel.add(makeKeyLabel("Target", targetColor));
+	    keyPanel.add(makeKeyLabel("Platform Current",
+				      platformMeasuredColor));
+	    keyPanel.add(makeKeyLabel("Platform Target", platformTargetColor));
+	    tempPanel.add(keyPanel, "center");
 	} else {
 	    tempEnable.setEnabled(false);
 	}
@@ -418,9 +425,7 @@ public class StatusPanel extends JPanel {
 	dataPanel.setLayout(new MigLayout("insets 1"));
 
 	dataLogEnable = new JCheckBox("Enable", false);
-	dataLogEnable.setToolTipText("log data to selected file; unlike " +
-				     "other checkboxes checking this is " +
-				     "not sticky");
+	dataLogEnable.setToolTipText("log selected data types to a file");
 	dataPanel.add(dataLogEnable, "wrap");
 
 	fileName = Base.preferences.get("status.log_file", fileName);
@@ -732,7 +737,7 @@ public class StatusPanel extends JPanel {
 		}
 		root.add(new LogElement("temperature", temperature));
 
-		tempAxis.setLabel(String.format("temp = %.0f/%.0f", 
+		tempAxis.setLabel(String.format("Extruder %.0f/%.0f \u00b0C", 
 						temperature, target));
 	    }
 
@@ -751,8 +756,9 @@ public class StatusPanel extends JPanel {
 		root.add(new LogElement("platformTemperature",
 					temperature));
 
-		platformTempAxis.setLabel(String.format("plat temp = %.0f/%.0f", 
-							temperature, target));
+		platformTempAxis.setLabel(
+                    String.format("Platform %.0f/%.0f \u00b0C", 
+				  temperature, target));
 	    }
 
 	    root.log();
