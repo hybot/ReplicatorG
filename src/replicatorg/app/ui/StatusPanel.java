@@ -333,24 +333,6 @@ public class StatusPanel extends JPanel {
 
 	add(infoPanel, "growx, span 2, wrap");
 
-	// temperature
-	JPanel tempPanel = new JPanel();
-	tempPanel.setBorder(BorderFactory.createTitledBorder("Temperature"));
-	tempPanel.setLayout(new MigLayout("insets 1"));
-
-	tempEnable = makeCheckBox("Enable", "status.temp", true);
-	tempEnable.setToolTipText("Toolhead and platform temperatures, " +
-				  "current and target");
-	tempPanel.add(tempEnable, "wrap");
-
-	if (t.hasHeater() || t.hasHeatedPlatform()) {
-	    tempPanel.add(makeChart(t));
-	} else {
-	    tempEnable.setEnabled(false);
-	}
-
-	add(tempPanel, "growx, growy");
-	
 	// position
 	final JPanel posPanel = new JPanel();
 	posPanel.setBorder(BorderFactory.createTitledBorder("Position"));
@@ -373,8 +355,26 @@ public class StatusPanel extends JPanel {
 	posPanel.add(new JLabel("B"));
 	posPanel.add(bBox, "wrap");
 
-	add(posPanel, "growx, growy, wrap");
+	add(posPanel, "growx, growy");
 
+	// temperature
+	JPanel tempPanel = new JPanel();
+	tempPanel.setBorder(BorderFactory.createTitledBorder("Temperature"));
+	tempPanel.setLayout(new MigLayout("insets 1"));
+
+	tempEnable = makeCheckBox("Enable", "status.temp", true);
+	tempEnable.setToolTipText("Toolhead and platform temperatures, " +
+				  "current and target");
+	tempPanel.add(tempEnable, "wrap");
+
+	if (t.hasHeater() || t.hasHeatedPlatform()) {
+	    tempPanel.add(makeChart(t));
+	} else {
+	    tempEnable.setEnabled(false);
+	}
+
+	add(tempPanel, "growx, growy, wrap");
+	
 	// speed
 	final JPanel speedPanel = new JPanel();
 	speedPanel.setBorder(BorderFactory.createTitledBorder("Speed"));
