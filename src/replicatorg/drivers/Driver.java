@@ -187,9 +187,19 @@ public interface Driver {
 	public void setFeedrate(double feed);
 
 	/**
-	 * sets the feedrate in mm/minute
+	 * sets the feedrate in mm/minute, per axis
+	 */
+        public void setFeedrate5d(Point5d feed);
+
+	/**
+	 * gets the feedrate in mm/minute
 	 */
 	public double getCurrentFeedrate();
+
+	/**
+	 * gets the feedrate in mm/minute, per axis
+	 */
+	public Point5d getCurrentFeedrate5d();
 
 	/**
 	 * Home the given set of axes at the given feedrate.  If the feedrate is <=0, run at

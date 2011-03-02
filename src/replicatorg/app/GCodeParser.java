@@ -100,6 +100,7 @@ public class GCodeParser {
 	 * Feedrate in mm/minute.
 	 */
 	double feedrate = 0.0;
+        Point5d feedrate5d;
 
 	/*
 	 * keep track of the last G code - this is the command mode to use if there
@@ -777,6 +778,24 @@ public class GCodeParser {
 			// Read feedrate in mm/min.
 			feedrate = getCodeValue("F");
 			driver.setFeedrate(feedrate);
+			feedrate5d = new Point5d();
+			if (hasCode("X"))
+			    feedrate5d.setX(feedrate);
+			if (hasCode("Y"))
+			    feedrate5d.setY(feedrate);
+			if (hasCode("Z"))
+			    feedrate5d.setZ(feedrate);
+			if (hasCode("A"))
+			    feedrate5d.setA(feedrate);
+			if (hasCode("E")) {
+				if (tool == 0)
+				    feedrate5d.setA(feedrate);
+				else if (tool == 1)
+				    feedrate5d.setB(feedrate);
+			}
+			if (hasCode("B"))
+			    feedrate5d.setB(feedrate);
+			driver.setFeedrate5d(feedrate5d);
 		}
 
 		// did we get a gcode?

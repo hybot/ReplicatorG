@@ -69,6 +69,9 @@ public class DriverBaseImplementation implements Driver {
 	// how fast are we moving in mm/minute
 	private double currentFeedrate;
 
+	// how fast are we moving in mm/minute
+        private Point5d currentFeedrate5d = new Point5d();
+
 	// what is our mode of positioning?
 	protected int positioningMode = 0;
 
@@ -314,11 +317,19 @@ public class DriverBaseImplementation implements Driver {
 		currentFeedrate = feed;
 	}
 
+	public void setFeedrate5d(Point5d feed) {
+		currentFeedrate5d = feed;
+	}
+
 	/**
 	 * gets the feedrate in mm/minute
 	 */
 	public double getCurrentFeedrate() {
 		return currentFeedrate;
+	}
+
+	public Point5d getCurrentFeedrate5d() {
+		return currentFeedrate5d;
 	}
 
 	/**
