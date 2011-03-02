@@ -206,6 +206,7 @@ public class JogPanel extends JPanel implements ActionListener, MouseListener
 		void updateFromField() {
 			int val = Integer.parseInt(field.getText());
 			feedrate.setAxis(axis, val);
+			feedrate.setY(feedrate.x());
 			Base.preferences.putInt(getPrefName(), val);
 			slider.setValue(val);
 		}
@@ -224,6 +225,7 @@ public class JogPanel extends JPanel implements ActionListener, MouseListener
 		public void stateChanged(ChangeEvent e) {
 			int val = slider.getValue();
 			feedrate.setAxis(axis, val);
+			feedrate.setY(feedrate.x());
 			Base.preferences.putInt(getPrefName(), val);			
 			field.setText(Integer.toString(val));			
 		}
@@ -338,8 +340,12 @@ public class JogPanel extends JPanel implements ActionListener, MouseListener
 					current.setAxis(axis, current.axis(axis) + (positive?jogRate:-jogRate));
 					double f = feedrate.axis(axis);
 					// Exception: XY feedrate is assumed to be X feedrate (symmetrical)
-					if (axis.equals(AxisId.Y)) { f = feedrate.axis(AxisId.X); }
+					if (axis.equals(AxisId.Y)) {
+					    f = feedrate.axis(AxisId.X);
+					    feedrate.setY(feedrate.x());
+					}
 					driver.setFeedrate(f);
+					driver.setFeedrate5d(feedrate);
 					driver.queuePoint(current);
 				}
 			} else if (s.equals("Stop")) {
@@ -352,8 +358,12 @@ public class JogPanel extends JPanel implements ActionListener, MouseListener
 				current.setAxis(axis, 0);
 				double f = feedrate.axis(axis);
 				// Exception: XY feedrate is assumed to be X feedrate (symmetrical)
-				if (axis.equals(AxisId.Y)) { f = feedrate.axis(AxisId.X); }
+				if (axis.equals(AxisId.Y)) {
+				    f = feedrate.axis(AxisId.X);
+				    feedrate.setY(feedrate.x());
+				}
 				driver.setFeedrate(f);
+				driver.setFeedrate5d(feedrate);
 				driver.queuePoint(current);
 			} else if (s.equals("Zero")) {
 				// "Zero" tells the machine to calibrate its
@@ -398,8 +408,12 @@ public class JogPanel extends JPanel implements ActionListener, MouseListener
 				current.setAxis(axis, current.axis(axis) + (positive?1000:-1000));
 				double f = feedrate.axis(axis);
 				// Exception: XY feedrate is assumed to be X feedrate (symmetrical)
-				if (axis.equals(AxisId.Y)) { f = feedrate.axis(AxisId.X); }
+				if (axis.equals(AxisId.Y)) {
+				    f = feedrate.axis(AxisId.X);
+				    feedrate.setY(feedrate.x());
+				}
 				driver.setFeedrate(f);
+				driver.setFeedrate5d(feedrate);
 				try {
 					driver.queuePoint(current);
 				} catch (RetryException e1) {
