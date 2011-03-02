@@ -4,7 +4,9 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GradientPaint;
 import java.awt.Graphics;
+import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
@@ -15,6 +17,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.logging.Level;
@@ -45,19 +48,38 @@ import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.AxisLocation;
+import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.NumberTickUnit;
 import org.jfree.chart.axis.TickUnits;
 import org.jfree.chart.axis.ValueAxis;
+import org.jfree.chart.labels.StandardCategoryItemLabelGenerator;
+import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.DatasetRenderingOrder;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.xy.XYDotRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.renderer.xy.XYStepRenderer;
+import org.jfree.data.general.DefaultValueDataset;
 import org.jfree.data.time.Second;
 import org.jfree.data.time.TimeTableXYDataset;
 import org.jfree.data.xy.DefaultXYDataset;
+import org.jfree.data.xy.XYDataset;
+import org.jfree.data.category.CategoryDataset;
+import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.chart.plot.dial.DialBackground;
+import org.jfree.chart.plot.dial.DialPlot;
+import org.jfree.chart.plot.dial.DialLayer;
+import org.jfree.chart.plot.dial.DialCap;
+import org.jfree.chart.plot.dial.DialPointer;
+import org.jfree.chart.plot.dial.DialTextAnnotation;
+import org.jfree.chart.plot.dial.DialValueIndicator;
+import org.jfree.chart.plot.dial.StandardDialFrame;
+import org.jfree.chart.plot.dial.StandardDialScale;
+import org.jfree.ui.GradientPaintTransformType;
+import org.jfree.ui.StandardGradientPaintTransformer;
 
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -67,10 +89,13 @@ import replicatorg.app.Base;
 import replicatorg.app.MachineController;
 import replicatorg.drivers.Driver;
 import replicatorg.drivers.RetryException;
+import replicatorg.drivers.UsesSerial;
 import replicatorg.drivers.gen3.Sanguino3GDriver;
-import replicatorg.machine.model.ToolModel;
+import replicatorg.machine.model.AxisId;
 import replicatorg.machine.model.BuildVolume;
+import replicatorg.machine.model.ToolModel;
 import replicatorg.util.Point5d;
+import replicatorg.app.util.serial.Serial;
 
 /**
  * Report various status bits of a printer, while in operation.
@@ -82,12 +107,6 @@ public class StatusPanel extends JPanel {
 
     JLabel aBox;
     JLabel bBox;
-
-    JLabel feedRateBox;
-
-    JLabel pwmBox;
-
-    JLabel rpmBox;
 
     JCheckBox tempEnable;
     JCheckBox xyzEnable;
@@ -102,6 +121,10 @@ public class StatusPanel extends JPanel {
     ValueAxis xAxis;
     ValueAxis yAxis;
     ValueAxis zAxis;
+
+    ValueAxis speedAxis;
+
+    Point5d maxFeedrate;
 
     PrintWriter logFileWriter = null;
     String fileName = null;
@@ -128,11 +151,16 @@ public class StatusPanel extends JPanel {
 
     private DefaultXYDataset xyDataset = new DefaultXYDataset();
     private DefaultXYDataset zDataset = new DefaultXYDataset();
+    private DefaultCategoryDataset speedDataset = new DefaultCategoryDataset();
+
+    private DefaultValueDataset motorDataset = new DefaultValueDataset();
 
     protected Driver driver;
 	
     private final Dimension labelMinimumSize = new Dimension(165, 25);
     private final Dimension textBoxSize = new Dimension(55, 25);
+
+    private final Set<AxisId> axes;
 
     /**
      * Make a label with an icon indicating its color on the graph.
@@ -150,7 +178,7 @@ public class StatusPanel extends JPanel {
 	return new JLabel(text,icon,SwingConstants.LEFT);
     }
 
-    public ChartPanel makeChart(ToolModel t) {
+    public ChartPanel makeTempChart(ToolModel t) {
 	JFreeChart chart = ChartFactory.createXYLineChart(null, null, null, 
 				measuredDataset, PlotOrientation.VERTICAL, 
 				false, false, false);
@@ -209,7 +237,7 @@ public class StatusPanel extends JPanel {
     public ChartPanel makeXYZChart() {
 	JFreeChart chart = ChartFactory.createScatterPlot(null, "x", "y", 
 				xyDataset, PlotOrientation.VERTICAL, 
-				false, false, false);
+				false, true, false);
 	chart.setBorderVisible(false);
 	chart.setBackgroundPaint(null);
 	XYPlot plot = chart.getXYPlot();
@@ -272,6 +300,143 @@ public class StatusPanel extends JPanel {
 	return chartPanel;
     }
 
+    public ChartPanel makeMotorDial(boolean isStepper) {
+	// get data for diagrams
+	DialPlot plot = new DialPlot();
+	plot.setView(0.0, 0.0, 1.0, 1.0);
+	plot.setDataset(0, motorDataset);
+	StandardDialFrame dialFrame = new StandardDialFrame();
+	dialFrame.setBackgroundPaint(Color.lightGray);
+	dialFrame.setForegroundPaint(Color.darkGray);
+	plot.setDialFrame(dialFrame);
+
+	GradientPaint gp = new GradientPaint(new Point(),
+					     new Color(255, 255, 255),
+					     new Point(),
+					     Color.lightGray);
+	DialBackground db = new DialBackground(gp);
+	db
+	    .setGradientPaintTransformer(new StandardGradientPaintTransformer(
+					GradientPaintTransformType.VERTICAL));
+	plot.setBackground(db);
+
+	DialTextAnnotation annotation1 =
+	    new DialTextAnnotation(isStepper ? "RPM" : "PWM");
+	annotation1.setFont(new Font("Dialog", Font.PLAIN, 14));
+	annotation1.setRadius(0.75);
+	plot.addLayer(annotation1);
+
+	/*
+	DialTextAnnotation annotation2 = new DialTextAnnotation("RPM");
+	annotation1.setFont(new Font("Dialog", Font.PLAIN, 12));
+	annotation2.setRadius(0.7);
+	plot.addLayer(annotation2);
+	*/
+
+
+	DialValueIndicator dvi = new DialValueIndicator(0);
+	dvi.setFont(new Font("Dialog", Font.PLAIN, 14));
+	dvi.setOutlinePaint(Color.darkGray);
+	dvi.setRadius(0.60);
+	//dvi.setAngle(-103.0);
+	dvi.setAngle(-90.0);
+	plot.addLayer(dvi);
+
+	/*
+	DialValueIndicator dvi2 = new DialValueIndicator(1);
+	dvi2.setFont(new Font("Dialog", Font.PLAIN, 10));
+	dvi2.setOutlinePaint(Color.red);
+	dvi2.setRadius(0.60);
+	dvi2.setAngle(-77.0);
+	plot.addLayer(dvi2);
+	*/
+
+	// RPM
+	StandardDialScale scale;
+	if(isStepper) {
+	    scale = new StandardDialScale(0D, 40D, -120D, -300D, 10D, 9);
+	} else {
+	    scale = new StandardDialScale(0D, 255D, -120D, -300D, 40D, 3);
+	}
+	scale.setTickRadius(0.88);
+	scale.setTickLabelOffset(0.15);
+	scale.setTickLabelFont(new Font("Dialog", Font.PLAIN, 14));
+	plot.addScale(0, scale);
+
+	/*
+	// PWM
+	StandardDialScale scale2 = new StandardDialScale(0D, 255D, -120D,
+							 -300D, 48D, 8);
+	scale2.setTickRadius(0.50);
+	scale2.setTickLabelOffset(0.15);
+	scale2.setTickLabelFont(new Font("Dialog", Font.PLAIN, 10));
+	scale2.setMajorTickPaint(Color.red);
+	plot.addScale(1, scale2);
+	plot.mapDatasetToScale(1, 1);
+	*/
+
+	DialPointer needle = new DialPointer.Pointer(0);
+	plot.addLayer(needle);
+
+	/*
+	DialPointer needle2 = new DialPointer.Pin(1);
+	needle2.setRadius(0.55);
+	plot.addLayer(needle2);
+	*/
+
+	DialCap cap = new DialCap();
+	cap.setRadius(0.08);
+	plot.setCap(cap);
+
+	JFreeChart chart = new JFreeChart(plot);
+	ChartPanel chartPanel = new ChartPanel(chart);
+	chartPanel.setPreferredSize(new Dimension(140, 140));
+	chartPanel.setMaximumSize(new Dimension(140, 140));
+	chartPanel.setMinimumSize(new Dimension(140, 140));
+	chartPanel.setOpaque(false);
+	return chartPanel;
+    }
+
+    public ChartPanel makeSpeedChart() {
+	JFreeChart chart =
+	    ChartFactory.createStackedBarChart(null, null, "Feedrate (mm/min)", 
+					speedDataset,
+					PlotOrientation.HORIZONTAL,
+					false, false, false);
+	chart.setBorderVisible(false);
+	chart.setBackgroundPaint(null);
+	CategoryPlot plot = chart.getCategoryPlot();
+
+	double maxMaxFeedrate = 0.0;
+	for (final AxisId axis : axes) {
+	    maxMaxFeedrate = Math.max(maxMaxFeedrate, maxFeedrate.axis(axis));
+	}
+
+	//get our platform ranges
+	speedAxis = plot.getRangeAxis();
+	speedAxis.setRange(0, maxMaxFeedrate + 100);
+	speedAxis.setMinorTickMarksVisible(false);
+
+	BarRenderer renderer = (BarRenderer)plot.getRenderer();
+	renderer.setShadowVisible(false);
+	renderer.setDrawBarOutline(true);
+	renderer.setSeriesPaint(0, Color.red);  // measured
+	renderer.setSeriesPaint(1, Color.lightGray); // max
+
+	renderer.setSeriesItemLabelsVisible(0, true);
+	// since we fudge the max values to get a constant total,
+	// we don't want to show it.
+	renderer.setSeriesItemLabelsVisible(1, false);
+	renderer.setBaseItemLabelGenerator(
+            new StandardCategoryItemLabelGenerator());
+   
+	ChartPanel chartPanel = new ChartPanel(chart);
+	chartPanel.setPreferredSize(new Dimension(210, 140));
+	chartPanel.setMaximumSize(new Dimension(210, 140));
+	chartPanel.setOpaque(false);
+	return chartPanel;
+    }
+
     private JLabel makeLabel(String text) {
 	JLabel label = new JLabel();
 	label.setText(text);
@@ -304,6 +469,8 @@ public class StatusPanel extends JPanel {
 	Dimension panelSize = new Dimension(420, 30);
 
 	driver = machine.getDriver();
+	axes = machine.getModel().getAvailableAxes();
+	maxFeedrate = machine.getModel().getMaximumFeedrates();
 
 	// create our initial panel
 	setLayout(new MigLayout("insets 2"));
@@ -313,7 +480,11 @@ public class StatusPanel extends JPanel {
 	{
 	    JLabel label = makeLabel("Driver");
 	    JLabel driverLabel = new JLabel();
-	    driverLabel.setText(driver.getDriverName());
+	    String port = "";
+	    if(driver instanceof UsesSerial) {
+		port = " on " + ((UsesSerial)driver).getSerial().getName();
+	    }
+	    driverLabel.setText(driver.getDriverName() + port);
 	    infoPanel.add(label);
 	    infoPanel.add(driverLabel, "wrap");
 	}
@@ -333,6 +504,31 @@ public class StatusPanel extends JPanel {
 
 	add(infoPanel, "growx, span 2, wrap");
 
+	// temperature
+	JPanel tempPanel = new JPanel();
+	tempPanel.setBorder(BorderFactory.createTitledBorder("Temperature"));
+	tempPanel.setLayout(new MigLayout("insets 1"));
+
+	tempEnable = makeCheckBox("Enable", "status.temp", true);
+	tempEnable.setToolTipText("Toolhead and platform temperatures, " +
+				  "current and target");
+	tempPanel.add(tempEnable, "wrap");
+
+	if (t.hasHeater() || t.hasHeatedPlatform()) {
+	    tempPanel.add(makeTempChart(t), "wrap");
+	    JPanel keyPanel = new JPanel();
+	    keyPanel.add(makeKeyLabel("Current", measuredColor));
+	    keyPanel.add(makeKeyLabel("Target", targetColor));
+	    keyPanel.add(makeKeyLabel("Platform Current",
+				      platformMeasuredColor));
+	    keyPanel.add(makeKeyLabel("Platform Target", platformTargetColor));
+	    tempPanel.add(keyPanel, "center");
+	} else {
+	    tempEnable.setEnabled(false);
+	}
+
+	add(tempPanel, "growx, growy");
+
 	// position
 	final JPanel posPanel = new JPanel();
 	posPanel.setBorder(BorderFactory.createTitledBorder("Position"));
@@ -346,42 +542,21 @@ public class StatusPanel extends JPanel {
 	bBox = makeBox(null);
 
 	posPanel.add(makeXYZChart(), "spany 4, growx");
-	posPanel.add(new JLabel(" "), "span 2, wrap"); // glue
 	
-	posPanel.add(new JLabel("A"));
-	posPanel.add(aBox, "wrap");
-
-	posPanel.add(new JLabel(" "), "span 2, wrap"); // glue
-	posPanel.add(new JLabel("B"));
-	posPanel.add(bBox, "wrap");
-
-	add(posPanel, "growx, growy");
-
-	// temperature
-	JPanel tempPanel = new JPanel();
-	tempPanel.setBorder(BorderFactory.createTitledBorder("Temperature"));
-	tempPanel.setLayout(new MigLayout("insets 1"));
-
-	tempEnable = makeCheckBox("Enable", "status.temp", true);
-	tempEnable.setToolTipText("Toolhead and platform temperatures, " +
-				  "current and target");
-	tempPanel.add(tempEnable, "wrap");
-
-	if (t.hasHeater() || t.hasHeatedPlatform()) {
-	    tempPanel.add(makeChart(t), "wrap");
-	    JPanel keyPanel = new JPanel();
-	    keyPanel.add(makeKeyLabel("Current", measuredColor));
-	    keyPanel.add(makeKeyLabel("Target", targetColor));
-	    keyPanel.add(makeKeyLabel("Platform Current",
-				      platformMeasuredColor));
-	    keyPanel.add(makeKeyLabel("Platform Target", platformTargetColor));
-	    tempPanel.add(keyPanel, "center");
-	} else {
-	    tempEnable.setEnabled(false);
+	if(axes.contains(AxisId.A)) {
+	    posPanel.add(new JLabel(" "), "span 2, wrap"); // glue
+	    posPanel.add(new JLabel("A"));
+	    posPanel.add(aBox, "wrap");
 	}
 
-	add(tempPanel, "growx, growy, wrap");
-	
+	if(axes.contains(AxisId.B)) {
+	    posPanel.add(new JLabel(" "), "span 2, wrap"); // glue
+	    posPanel.add(new JLabel("B"));
+	    posPanel.add(bBox, "wrap");
+	}
+
+	add(posPanel, "growx, growy, wrap");
+
 	// speed
 	final JPanel speedPanel = new JPanel();
 	speedPanel.setBorder(BorderFactory.createTitledBorder("Speed"));
@@ -391,32 +566,9 @@ public class StatusPanel extends JPanel {
 	speedEnable.setToolTipText("Extrusion motor speeds and feed rates");
 	speedPanel.add(speedEnable, "wrap");
 
-	// create our motor options
-	if (t.hasMotor()) {
-	    // Due to current implementation issues, we need to send the PWM
-	    // before the RPM for a stepper motor. Thus we display both 
-	    // controls in these cases. This shouldn't be necessary for a
-	    // Gen4 stepper extruder.
-	    if (t.getMotorStepperAxis() == null) {
-		pwmBox = makeBox(null);
-		
-		speedPanel.add(makeLabel("Motor Speed (PWM)"));
-		speedPanel.add(pwmBox, "wrap");
-	    }
-
-	    if (t.motorHasEncoder() || t.motorIsStepper()) {
-		rpmBox = makeBox(null);
-
-		speedPanel.add(makeLabel("Motor Speed (RPM)"));
-		speedPanel.add(rpmBox, "wrap");
-	    }
-	}
-
-	feedRateBox = makeBox(null);
-
-	speedPanel.add(makeLabel("Feed Rate (mm/min)"));
-	speedPanel.add(feedRateBox, "wrap");
-
+	speedPanel.add(makeMotorDial(toolModel.getMotorStepperAxis() != null),
+		       "growx, growy");
+	speedPanel.add(makeSpeedChart(), "growx, growy, wrap");
 	add(speedPanel, "growx, growy");
 
 	// data logging
@@ -432,6 +584,9 @@ public class StatusPanel extends JPanel {
 
 	final JLabel fileLabel = makeLabel(getName(fileName));
 	fileLabel.setToolTipText("base file name of the log file");
+	fileLabel.setMinimumSize(new Dimension(100, 25));
+	fileLabel.setMaximumSize(new Dimension(100, 25));
+	fileLabel.setPreferredSize(new Dimension(100, 25));
 
 	final JFileChooser chooser = new JFileChooser(fileName);
 
@@ -519,7 +674,7 @@ public class StatusPanel extends JPanel {
 	dataPanel.add(fileLabel, "wrap");
 	dataPanel.add(taggedBox);
 	dataPanel.add(csvBox);
-	add(dataPanel, "growx");
+	add(dataPanel, "growx, growy");
 
 	JLabel updateLabel = new JLabel("Update Interval (sec)");
 	updateBox = new JComboBox(updateStrings);
@@ -579,13 +734,13 @@ public class StatusPanel extends JPanel {
 	return filePath;
     }
 
-    public String getPositionText(Point5d position) {
-	if(position == null) {
+    public String get5dText(Point5d point) {
+	if(point == null) {
 	    return "unknown";
 	}
 	return String.format("%.2f, %.2f, %.2f, %.2f, %.2f", 
-			     position.x(), position.y(), position.z(),
-			     position.a(), position.b());
+			     point.x(), point.y(), point.z(),
+			     point.a(), point.b());
     }
 	    
     class LogElement {
@@ -681,9 +836,7 @@ public class StatusPanel extends JPanel {
 
 	    if(xyzEnable.isSelected()) {
 		position = driver.getCurrentPosition();
-	    }
 
-	    if(xyzEnable.isSelected()) {
 		//todo: permit multiple series for data overlays
 		final String series = "1";
 
@@ -698,67 +851,92 @@ public class StatusPanel extends JPanel {
 
 		aBox.setText(String.valueOf(position.a()));
 		bBox.setText(String.valueOf(position.b()));
-		root.add(new LogElement("position", getPositionText(position)));
+		root.add(new LogElement("position", get5dText(position)));
 	    }
 
-	    if (toolModel.hasMotor()) {
-		if (toolModel.getMotorStepperAxis() == null) {
-		    if(speedEnable.isSelected()) {
+	    if(tempEnable.isSelected()) {
+		if (toolModel.hasHeater()) {
+		    double target = driver.getTemperatureSetting();
+		    targetDataset.add(second, target, "Target");
+		    root.add(new LogElement("targetTemperature", target));
+
+		    double temperature = driver.getTemperature();
+
+		    // avoid spikes in the graph when it's not readable
+		    if(temperature > 0) {
+			measuredDataset.add(second, temperature, "Current");
+		    }
+		    root.add(new LogElement("temperature", temperature));
+
+		    tempAxis.setLabel(
+		        String.format("Extruder %.0f/%.0f \u00b0C", 
+				      temperature, target));
+		}
+
+		if (toolModel.hasHeatedPlatform()) {
+		    double target = driver.getPlatformTemperatureSetting();
+		    platformTargetDataset.add(second, target,
+					      "Platform Target");
+		    root.add(new LogElement("platformTargetTemperature",
+					    target));
+
+		    double temperature = driver.getPlatformTemperature();
+
+		    // avoid spikes in the graph when it's not readable
+		    if(temperature > 0) {
+			platformMeasuredDataset.add(second, temperature,
+						    "Platform Current");
+		    }
+		    root.add(new LogElement("platformTemperature",
+					    temperature));
+
+		    platformTempAxis.setLabel(
+                        String.format("Platform %.0f/%.0f \u00b0C", 
+				      temperature, target));
+		}
+	    }
+
+	    if (speedEnable.isSelected()) {
+		if (toolModel.hasMotor()) {
+		    if (toolModel.getMotorStepperAxis() == null) {
 			int pwm = driver.getMotorSpeedPWM();
-			pwmBox.setText(String.valueOf(pwm));
+			motorDataset.setValue(pwm);
 			root.add(new LogElement("pwm", pwm));
 		    }
-		}
-		if (toolModel.motorHasEncoder() || toolModel.motorIsStepper()) {
-		    if(speedEnable.isSelected()) {
+		    if (toolModel.motorHasEncoder() ||
+			toolModel.motorIsStepper()) {
 			double rpm = driver.getMotorRPM();
-			rpmBox.setText(String.valueOf(rpm));
+			motorDataset.setValue(rpm);
 			root.add(new LogElement("rpm", rpm));
 		    }
 		}
-	    }
 
-	    if(speedEnable.isSelected()) {
-		String feedRate = Double.toString(driver.getCurrentFeedrate());
-		feedRateBox.setText(feedRate);
-		root.add(new LogElement("feedRate", feedRate));
-	    }
+		Point5d feedrate5d = driver.getCurrentFeedrate5d();
+		
+		speedDataset.setValue(feedrate5d.x(), "Current", "X");
+		speedDataset.setValue(feedrate5d.y(), "Current", "Y");
+		speedDataset.setValue(feedrate5d.z(), "Current", "Z");
 
-	    if (toolModel.hasHeater() && tempEnable.isSelected()) {
-		double target = driver.getTemperatureSetting();
-		targetDataset.add(second, target, "a");
-		root.add(new LogElement("targetTemperature", target));
-
-		double temperature = driver.getTemperature();
-
-		// avoid spikes in the graph when it's not readable
-		if(temperature > 0) {
-		    measuredDataset.add(second, temperature, "a");
+		if(axes.contains(AxisId.A)) {
+		    speedDataset.setValue(feedrate5d.a(), "Current", "A");
 		}
-		root.add(new LogElement("temperature", temperature));
-
-		tempAxis.setLabel(String.format("Extruder %.0f/%.0f \u00b0C", 
-						temperature, target));
-	    }
-
-	    if (toolModel.hasHeatedPlatform() && tempEnable.isSelected()) {
-		double target = driver.getPlatformTemperatureSetting();
-		platformTargetDataset.add(second, target, "a");
-		root.add(new LogElement("platformTargetTemperature",
-					target));
-
-		double temperature = driver.getPlatformTemperature();
-
-		// avoid spikes in the graph when it's not readable
-		if(temperature > 0) {
-		    platformMeasuredDataset.add(second, temperature, "a");
+		if(axes.contains(AxisId.B)) {
+		    speedDataset.setValue(feedrate5d.b(), "Current", "B");
 		}
-		root.add(new LogElement("platformTemperature",
-					temperature));
+		root.add(new LogElement("feedRate", get5dText(feedrate5d)));
 
-		platformTempAxis.setLabel(
-                    String.format("Platform %.0f/%.0f \u00b0C", 
-				  temperature, target));
+		Point5d diffFeedrate = new Point5d();
+		diffFeedrate.sub(maxFeedrate, feedrate5d);
+
+		speedDataset.setValue(diffFeedrate.x(), "Max", "X");
+		speedDataset.setValue(diffFeedrate.y(), "Max", "Y");
+		speedDataset.setValue(diffFeedrate.z(), "Max", "Z");
+		if(axes.contains(AxisId.A)) {
+		    speedDataset.setValue(diffFeedrate.a(), "Max", "A");
+		}
+		if(axes.contains(AxisId.B)) {
+		    speedDataset.setValue(diffFeedrate.b(), "Max", "B");
+		}
 	    }
 
 	    root.log();
