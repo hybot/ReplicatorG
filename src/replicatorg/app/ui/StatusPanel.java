@@ -14,6 +14,8 @@ import java.awt.event.FocusListener;
 import java.awt.event.ItemEvent;
 import java.awt.image.BufferedImage;
 
+import java.text.NumberFormat;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -399,7 +401,7 @@ public class StatusPanel extends JPanel {
 
     public ChartPanel makeSpeedChart() {
 	JFreeChart chart =
-	    ChartFactory.createStackedBarChart(null, null, "Feedrate (mm/min)", 
+	    ChartFactory.createStackedBarChart(null, null, "Feedrate (mm/sec)", 
 					speedDataset,
 					PlotOrientation.HORIZONTAL,
 					false, false, false);
@@ -411,24 +413,29 @@ public class StatusPanel extends JPanel {
 	for (final AxisId axis : axes) {
 	    maxMaxFeedrate = Math.max(maxMaxFeedrate, maxFeedrate.axis(axis));
 	}
+	maxMaxFeedrate /= 60;  // convert to mm/sec
 
-	//get our platform ranges
 	speedAxis = plot.getRangeAxis();
-	speedAxis.setRange(0, maxMaxFeedrate + 100);
+	speedAxis.setRange(1, maxMaxFeedrate * 1.05);
 	speedAxis.setMinorTickMarksVisible(false);
 
 	BarRenderer renderer = (BarRenderer)plot.getRenderer();
 	renderer.setShadowVisible(false);
 	renderer.setDrawBarOutline(true);
-	renderer.setSeriesPaint(0, Color.red);  // measured
+	renderer.setSeriesPaint(0, Color.green.darker());  // measured
 	renderer.setSeriesPaint(1, Color.lightGray); // max
 
 	renderer.setSeriesItemLabelsVisible(0, true);
 	// since we fudge the max values to get a constant total,
 	// we don't want to show it.
 	renderer.setSeriesItemLabelsVisible(1, false);
-	renderer.setBaseItemLabelGenerator(
-            new StandardCategoryItemLabelGenerator());
+
+	// keep the precision of the label to tenths.
+	StandardCategoryItemLabelGenerator labelGenerator =
+	    new StandardCategoryItemLabelGenerator();
+	NumberFormat formatter = labelGenerator.getNumberFormat();
+	formatter.setMaximumFractionDigits(1);
+	renderer.setBaseItemLabelGenerator(labelGenerator);
    
 	ChartPanel chartPanel = new ChartPanel(chart);
 	chartPanel.setPreferredSize(new Dimension(210, 140));
@@ -674,7 +681,7 @@ public class StatusPanel extends JPanel {
 	dataPanel.add(fileLabel, "wrap");
 	dataPanel.add(taggedBox);
 	dataPanel.add(csvBox);
-	add(dataPanel, "growx, growy");
+	add(dataPanel, "growx, top, wrap");
 
 	JLabel updateLabel = new JLabel("Update Interval (sec)");
 	updateBox = new JComboBox(updateStrings);
@@ -912,30 +919,34 @@ public class StatusPanel extends JPanel {
 		}
 
 		Point5d feedrate5d = driver.getCurrentFeedrate5d();
-		
-		speedDataset.setValue(feedrate5d.x(), "Current", "X");
-		speedDataset.setValue(feedrate5d.y(), "Current", "Y");
-		speedDataset.setValue(feedrate5d.z(), "Current", "Z");
+
+		// we convert all feedrates from mm/min to mm/sec.
+		speedDataset.setValue(feedrate5d.x()/60, "Current", "X");
+		speedDataset.setValue(feedrate5d.y()/60, "Current", "Y");
+		speedDataset.setValue(feedrate5d.z()/60, "Current", "Z");
 
 		if(axes.contains(AxisId.A)) {
-		    speedDataset.setValue(feedrate5d.a(), "Current", "A");
+		    speedDataset.setValue(feedrate5d.a()/60, "Current", "A");
 		}
 		if(axes.contains(AxisId.B)) {
-		    speedDataset.setValue(feedrate5d.b(), "Current", "B");
+		    speedDataset.setValue(feedrate5d.b()/60, "Current", "B");
 		}
 		root.add(new LogElement("feedRate", get5dText(feedrate5d)));
 
+		// we fake a bar segment so that the bar stack always
+		// equals the max feedrate, for each axis.  this becomes
+		// the "background" bar
 		Point5d diffFeedrate = new Point5d();
 		diffFeedrate.sub(maxFeedrate, feedrate5d);
 
-		speedDataset.setValue(diffFeedrate.x(), "Max", "X");
-		speedDataset.setValue(diffFeedrate.y(), "Max", "Y");
-		speedDataset.setValue(diffFeedrate.z(), "Max", "Z");
+		speedDataset.setValue(diffFeedrate.x()/60, "Max", "X");
+		speedDataset.setValue(diffFeedrate.y()/60, "Max", "Y");
+		speedDataset.setValue(diffFeedrate.z()/60, "Max", "Z");
 		if(axes.contains(AxisId.A)) {
-		    speedDataset.setValue(diffFeedrate.a(), "Max", "A");
+		    speedDataset.setValue(diffFeedrate.a()/60, "Max", "A");
 		}
 		if(axes.contains(AxisId.B)) {
-		    speedDataset.setValue(diffFeedrate.b(), "Max", "B");
+		    speedDataset.setValue(diffFeedrate.b()/60, "Max", "B");
 		}
 	    }
 
