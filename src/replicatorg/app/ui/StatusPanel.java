@@ -50,17 +50,13 @@ import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.AxisLocation;
-import org.jfree.chart.axis.CategoryAxis;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.chart.axis.NumberTickUnit;
 import org.jfree.chart.axis.TickUnits;
 import org.jfree.chart.axis.ValueAxis;
-import org.jfree.chart.labels.StandardCategoryItemLabelGenerator;
-import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.DatasetRenderingOrder;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
-import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.xy.XYDotRenderer;
 import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
 import org.jfree.chart.renderer.xy.XYStepRenderer;
@@ -69,8 +65,6 @@ import org.jfree.data.time.Second;
 import org.jfree.data.time.TimeTableXYDataset;
 import org.jfree.data.xy.DefaultXYDataset;
 import org.jfree.data.xy.XYDataset;
-import org.jfree.data.category.CategoryDataset;
-import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.chart.plot.dial.DialBackground;
 import org.jfree.chart.plot.dial.DialPlot;
 import org.jfree.chart.plot.dial.DialLayer;
@@ -153,9 +147,9 @@ public class StatusPanel extends JPanel {
 
     private DefaultXYDataset xyDataset = new DefaultXYDataset();
     private DefaultXYDataset zDataset = new DefaultXYDataset();
-    private DefaultCategoryDataset speedDataset = new DefaultCategoryDataset();
 
-    private DefaultValueDataset motorDataset = new DefaultValueDataset();
+    private DefaultValueDataset speedDataset = new DefaultValueDataset();
+    private DefaultValueDataset feedDataset = new DefaultValueDataset();
 
     protected Driver driver;
 	
@@ -302,11 +296,11 @@ public class StatusPanel extends JPanel {
 	return chartPanel;
     }
 
-    public ChartPanel makeMotorDial(boolean isStepper) {
+    public ChartPanel makeSpeedDial(boolean isStepper) {
 	// get data for diagrams
 	DialPlot plot = new DialPlot();
 	plot.setView(0.0, 0.0, 1.0, 1.0);
-	plot.setDataset(0, motorDataset);
+	plot.setDataset(0, speedDataset);
 	StandardDialFrame dialFrame = new StandardDialFrame();
 	dialFrame.setBackgroundPaint(Color.lightGray);
 	dialFrame.setForegroundPaint(Color.darkGray);
@@ -322,67 +316,65 @@ public class StatusPanel extends JPanel {
 					GradientPaintTransformType.VERTICAL));
 	plot.setBackground(db);
 
+	// outter scale
 	DialTextAnnotation annotation1 =
 	    new DialTextAnnotation(isStepper ? "RPM" : "PWM");
-	annotation1.setFont(new Font("Dialog", Font.PLAIN, 14));
-	annotation1.setRadius(0.75);
+	annotation1.setFont(new Font("Dialog", Font.BOLD, 18));
+	annotation1.setRadius(0.73);
 	plot.addLayer(annotation1);
 
-	/*
-	DialTextAnnotation annotation2 = new DialTextAnnotation("RPM");
+	DialTextAnnotation annotation2 = new DialTextAnnotation("Speed");
 	annotation1.setFont(new Font("Dialog", Font.PLAIN, 12));
-	annotation2.setRadius(0.7);
+	annotation2.setRadius(0.2);
 	plot.addLayer(annotation2);
-	*/
-
 
 	DialValueIndicator dvi = new DialValueIndicator(0);
-	dvi.setFont(new Font("Dialog", Font.PLAIN, 14));
+	dvi.setFont(new Font("Dialog", Font.PLAIN, 16));
 	dvi.setOutlinePaint(Color.darkGray);
-	dvi.setRadius(0.60);
+	dvi.setRadius(0.55);
 	//dvi.setAngle(-103.0);
 	dvi.setAngle(-90.0);
 	plot.addLayer(dvi);
 
-	/*
-	DialValueIndicator dvi2 = new DialValueIndicator(1);
-	dvi2.setFont(new Font("Dialog", Font.PLAIN, 10));
-	dvi2.setOutlinePaint(Color.red);
-	dvi2.setRadius(0.60);
-	dvi2.setAngle(-77.0);
-	plot.addLayer(dvi2);
-	*/
-
-	// RPM
 	StandardDialScale scale;
 	if(isStepper) {
-	    scale = new StandardDialScale(0D, 40D, -120D, -300D, 10D, 9);
+	    scale = new StandardDialScale(0D, 10D, -140D, -260D, 1D, 4);
 	} else {
-	    scale = new StandardDialScale(0D, 255D, -120D, -300D, 40D, 3);
+	    scale = new StandardDialScale(0D, 256D, -140D, -260D, 32D, 4);
 	}
-	scale.setTickRadius(0.88);
-	scale.setTickLabelOffset(0.15);
-	scale.setTickLabelFont(new Font("Dialog", Font.PLAIN, 14));
+	scale.setTickRadius(0.9);
+	scale.setTickLabelOffset(0.17);
+	scale.setTickLabelFont(new Font("Dialog", Font.PLAIN, 15));
 	plot.addScale(0, scale);
-
-	/*
-	// PWM
-	StandardDialScale scale2 = new StandardDialScale(0D, 255D, -120D,
-							 -300D, 48D, 8);
-	scale2.setTickRadius(0.50);
-	scale2.setTickLabelOffset(0.15);
-	scale2.setTickLabelFont(new Font("Dialog", Font.PLAIN, 10));
-	scale2.setMajorTickPaint(Color.red);
-	plot.addScale(1, scale2);
-	plot.mapDatasetToScale(1, 1);
-	*/
 
 	DialPointer needle = new DialPointer.Pointer(0);
 	plot.addLayer(needle);
 
 	/*
+	// inner scale
+	//DialTextAnnotation annotation2 = new DialTextAnnotation("PWM");
+	//annotation1.setFont(new Font("Dialog", Font.PLAIN, 12));
+	//annotation2.setRadius(0.7);
+	//plot.addLayer(annotation2);
+
+	//DialValueIndicator dvi2 = new DialValueIndicator(1);
+	//dvi2.setFont(new Font("Dialog", Font.PLAIN, 10));
+	//dvi2.setOutlinePaint(Color.red);
+	//dvi2.setRadius(0.60);
+	//dvi2.setAngle(-77.0);
+	//plot.addLayer(dvi2);
+
+	StandardDialScale scale2 = new StandardDialScale(0D, 256D, -120D,
+							 -300D, 64D, 4);
+	scale2.setTickRadius(0.60);
+	scale2.setTickLabelOffset(0.15);
+	scale2.setTickLabelFont(new Font("Dialog", Font.PLAIN, 10));
+	scale2.setMajorTickPaint(Color.red);
+	plot.addScale(1, scale2);
+	plot.mapDatasetToScale(1, 1);
+
 	DialPointer needle2 = new DialPointer.Pin(1);
-	needle2.setRadius(0.55);
+	needle2.setRadius(0.6);
 	plot.addLayer(needle2);
 	*/
 
@@ -399,15 +391,25 @@ public class StatusPanel extends JPanel {
 	return chartPanel;
     }
 
-    public ChartPanel makeSpeedChart() {
-	JFreeChart chart =
-	    ChartFactory.createStackedBarChart(null, null, "Feedrate (mm/sec)", 
-					speedDataset,
-					PlotOrientation.HORIZONTAL,
-					false, false, false);
-	chart.setBorderVisible(false);
-	chart.setBackgroundPaint(null);
-	CategoryPlot plot = chart.getCategoryPlot();
+    public ChartPanel makeFeedDial() {
+	// get data for diagrams
+	DialPlot plot = new DialPlot();
+	plot.setView(0.0, 0.0, 1.0, 1.0);
+	plot.setDataset(0, feedDataset);
+	StandardDialFrame dialFrame = new StandardDialFrame();
+	dialFrame.setBackgroundPaint(Color.lightGray);
+	dialFrame.setForegroundPaint(Color.darkGray);
+	plot.setDialFrame(dialFrame);
+
+	GradientPaint gp = new GradientPaint(new Point(),
+					     new Color(255, 255, 255),
+					     new Point(),
+					     Color.lightGray);
+	DialBackground db = new DialBackground(gp);
+	db
+	    .setGradientPaintTransformer(new StandardGradientPaintTransformer(
+					GradientPaintTransformType.VERTICAL));
+	plot.setBackground(db);
 
 	double maxMaxFeedrate = 0.0;
 	for (final AxisId axis : axes) {
@@ -415,31 +417,49 @@ public class StatusPanel extends JPanel {
 	}
 	maxMaxFeedrate /= 60;  // convert to mm/sec
 
-	speedAxis = plot.getRangeAxis();
-	speedAxis.setRange(1, maxMaxFeedrate * 1.05);
-	speedAxis.setMinorTickMarksVisible(false);
+	// round up to next multiple of 10.
+	double divisor = (int)maxMaxFeedrate/10 + 1;
+	maxMaxFeedrate = divisor * 10;
 
-	BarRenderer renderer = (BarRenderer)plot.getRenderer();
-	renderer.setShadowVisible(false);
-	renderer.setDrawBarOutline(true);
-	renderer.setSeriesPaint(0, Color.green.darker());  // measured
-	renderer.setSeriesPaint(1, Color.lightGray); // max
+	DialTextAnnotation annotation1 = new DialTextAnnotation("mm/s");
+	annotation1.setFont(new Font("Dialog", Font.BOLD, 18));
+	annotation1.setRadius(0.73);
+	plot.addLayer(annotation1);
 
-	renderer.setSeriesItemLabelsVisible(0, true);
-	// since we fudge the max values to get a constant total,
-	// we don't want to show it.
-	renderer.setSeriesItemLabelsVisible(1, false);
+	DialTextAnnotation annotation2 = new DialTextAnnotation("Feedrate");
+	annotation1.setFont(new Font("Dialog", Font.PLAIN, 12));
+	annotation2.setRadius(0.2);
+	plot.addLayer(annotation2);
 
-	// keep the precision of the label to tenths.
-	StandardCategoryItemLabelGenerator labelGenerator =
-	    new StandardCategoryItemLabelGenerator();
-	NumberFormat formatter = labelGenerator.getNumberFormat();
-	formatter.setMaximumFractionDigits(1);
-	renderer.setBaseItemLabelGenerator(labelGenerator);
-   
+	DialValueIndicator dvi = new DialValueIndicator(0);
+	dvi.setFont(new Font("Dialog", Font.PLAIN, 16));
+	dvi.setOutlinePaint(Color.darkGray);
+	dvi.setRadius(0.55);
+	//dvi.setAngle(-103.0);
+	dvi.setAngle(-90.0);
+	plot.addLayer(dvi);
+
+	StandardDialScale scale =
+	    new StandardDialScale(0D, maxMaxFeedrate, -140D, -260D,
+				  maxMaxFeedrate/divisor, 4);
+
+	scale.setTickRadius(0.9);
+	scale.setTickLabelOffset(0.17);
+	scale.setTickLabelFont(new Font("Dialog", Font.PLAIN, 15));
+	plot.addScale(0, scale);
+
+	DialPointer needle = new DialPointer.Pointer(0);
+	plot.addLayer(needle);
+
+	DialCap cap = new DialCap();
+	cap.setRadius(0.08);
+	plot.setCap(cap);
+
+	JFreeChart chart = new JFreeChart(plot);
 	ChartPanel chartPanel = new ChartPanel(chart);
-	chartPanel.setPreferredSize(new Dimension(210, 140));
-	chartPanel.setMaximumSize(new Dimension(210, 140));
+	chartPanel.setPreferredSize(new Dimension(140, 140));
+	chartPanel.setMaximumSize(new Dimension(140, 140));
+	chartPanel.setMinimumSize(new Dimension(140, 140));
 	chartPanel.setOpaque(false);
 	return chartPanel;
     }
@@ -570,12 +590,21 @@ public class StatusPanel extends JPanel {
 	speedPanel.setLayout(new MigLayout("insets 1"));
 
 	speedEnable = makeCheckBox("Enable", "status.speed", false);
-	speedEnable.setToolTipText("Extrusion motor speeds and feed rates");
-	speedPanel.add(speedEnable, "wrap");
+	speedEnable.setToolTipText("Extrusion speeds and platform feed rates");
+	speedPanel.add(speedEnable, "span 3, wrap");
 
-	speedPanel.add(makeMotorDial(toolModel.getMotorStepperAxis() != null),
-		       "growx, growy");
-	speedPanel.add(makeSpeedChart(), "growx, growy, wrap");
+	JPanel centerPanel = new JPanel();
+	centerPanel.add(makeSpeedDial(toolModel.getMotorStepperAxis() != null));
+
+	JLabel gap = new JLabel("");
+	gap.setMinimumSize(new Dimension(20, 25));
+	gap.setMaximumSize(new Dimension(20, 25));
+	gap.setPreferredSize(new Dimension(20, 25));
+	centerPanel.add(gap);
+
+	centerPanel.add(makeFeedDial());
+
+	speedPanel.add(centerPanel, "dock center, wrap");
 	add(speedPanel, "growx, growy");
 
 	// data logging
@@ -907,47 +936,18 @@ public class StatusPanel extends JPanel {
 		if (toolModel.hasMotor()) {
 		    if (toolModel.getMotorStepperAxis() == null) {
 			int pwm = driver.getMotorSpeedPWM();
-			motorDataset.setValue(pwm);
+			speedDataset.setValue(pwm);
 			root.add(new LogElement("pwm", pwm));
 		    }
 		    if (toolModel.motorHasEncoder() ||
 			toolModel.motorIsStepper()) {
 			double rpm = driver.getMotorRPM();
-			motorDataset.setValue(rpm);
+			speedDataset.setValue(rpm);
 			root.add(new LogElement("rpm", rpm));
 		    }
 		}
 
-		Point5d feedrate5d = driver.getCurrentFeedrate5d();
-
-		// we convert all feedrates from mm/min to mm/sec.
-		speedDataset.setValue(feedrate5d.x()/60, "Current", "X");
-		speedDataset.setValue(feedrate5d.y()/60, "Current", "Y");
-		speedDataset.setValue(feedrate5d.z()/60, "Current", "Z");
-
-		if(axes.contains(AxisId.A)) {
-		    speedDataset.setValue(feedrate5d.a()/60, "Current", "A");
-		}
-		if(axes.contains(AxisId.B)) {
-		    speedDataset.setValue(feedrate5d.b()/60, "Current", "B");
-		}
-		root.add(new LogElement("feedRate", get5dText(feedrate5d)));
-
-		// we fake a bar segment so that the bar stack always
-		// equals the max feedrate, for each axis.  this becomes
-		// the "background" bar
-		Point5d diffFeedrate = new Point5d();
-		diffFeedrate.sub(maxFeedrate, feedrate5d);
-
-		speedDataset.setValue(diffFeedrate.x()/60, "Max", "X");
-		speedDataset.setValue(diffFeedrate.y()/60, "Max", "Y");
-		speedDataset.setValue(diffFeedrate.z()/60, "Max", "Z");
-		if(axes.contains(AxisId.A)) {
-		    speedDataset.setValue(diffFeedrate.a()/60, "Max", "A");
-		}
-		if(axes.contains(AxisId.B)) {
-		    speedDataset.setValue(diffFeedrate.b()/60, "Max", "B");
-		}
+		feedDataset.setValue(driver.getCurrentFeedrate()/60.0);
 	    }
 
 	    root.log();
