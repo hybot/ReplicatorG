@@ -195,7 +195,7 @@ public class MainButtonPanel extends BGPanel implements MachineListener, ActionL
 		statusLabel = new JLabel();
 		statusLabel.setFont(statusFont);
 		statusLabel.setForeground(statusColor);
-		add(statusLabel, "gap unrelated,growx");
+		add(statusLabel, "gap unrelated");
 
 		simButton.setToolTipText("This will open a window showing a rapid simulation of what toolpaths the machine is going to perform.");
 		buildButton.setToolTipText("This will start building the object on the machine.");
